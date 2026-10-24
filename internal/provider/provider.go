@@ -3,8 +3,8 @@ package provider
 import (
 	"context"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"gitlab.com/stellivix/terraform-provider-technitium/internal/technitium"
 	"os"
-	"terraform-provider-technitium/internal/technitium"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"

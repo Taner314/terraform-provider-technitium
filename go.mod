@@ -1,4 +1,4 @@
-module terraform-provider-technitium
+module gitlab.com/stellivix/terraform-provider-technitium
 
 go 1.24.0
 

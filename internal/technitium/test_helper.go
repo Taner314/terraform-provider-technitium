@@ -1,6 +1,6 @@
 package technitium
 
-import "terraform-provider-technitium/internal/test"
+import "gitlab.com/stellivix/terraform-provider-technitium/internal/test"
 
 func GetMockClient(scenario test.Scenario) (*Client, func()) {
 

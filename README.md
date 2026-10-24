@@ -1,8 +1,10 @@
 # Terraform Provider - Technitium DNS Server
 
-Works with Technitium v13.x [API](https://github.com/TechnitiumSoftware/DnsServer/blob/master/APIDOCS.md) 
+Terraform/OpenTofu provider for the Technitium DNS Server [API](https://github.com/TechnitiumSoftware/DnsServer/blob/master/APIDOCS.md).
+Tested against Technitium v14.x and v15.x.
 
-Provider documentation is available at [registry.terraform.io/kenske/technitium](https://registry.terraform.io/providers/kenske/technitium/latest/docs).
+Forked from [kenske/terraform-provider-technitium](https://github.com/kenske/terraform-provider-technitium) (MIT).
+Not yet published to a public registry; see [Provider Development](#provider-development) for local use.
 
 ## Getting Started
 
@@ -13,7 +15,7 @@ terraform {
   required_providers {
     technitium = {
       version = "~> 0.2.2"
-      source = "registry.terraform.io/kenske/technitium"
+      source = "registry.terraform.io/stellivix/technitium"
     }
   }
 }
@@ -38,7 +40,7 @@ Complete example:
 terraform {
   required_providers {
     technitium = {
-      source = "registry.terraform.io/kenske/technitium"
+      source = "registry.terraform.io/stellivix/technitium"
     }
   }
 }
@@ -123,7 +125,7 @@ resource "technitium_dns_zone_record" "a" {
 provider_installation {
 
   dev_overrides {
-      "registry.terraform.io/kenske/technitium" = "/path/to/go/bin" # e.g. /home/user/go/bin
+      "registry.terraform.io/stellivix/technitium" = "/path/to/go/bin" # e.g. /home/user/go/bin
   }
 
   # For all other providers, install them directly from their origin provider
@@ -134,4 +136,14 @@ provider_installation {
 
 ```
 5. Use `TF_LOG_PROVIDER=debug` to enable debug logging for the provider.
+
+### Tests
+
+```sh
+docker compose -f docker/docker-compose.yaml up -d   # Technitium on localhost:5380
+make test                                            # unit tests
+TECHNITIUM_HOST=http://localhost:5380 make testacc   # acceptance tests
+```
+
+CI (`.gitlab-ci.yml`) runs the acceptance suite against Technitium 14.x and 15.x with both Terraform and OpenTofu.
 

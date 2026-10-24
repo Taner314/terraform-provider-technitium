@@ -2,7 +2,7 @@ package provider
 
 import (
 	"context"
-	"terraform-provider-technitium/internal/technitium"
+	"gitlab.com/stellivix/terraform-provider-technitium/internal/technitium"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
