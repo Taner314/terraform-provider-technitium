@@ -36,10 +36,11 @@ type technitiumProvider struct {
 }
 
 type technitiumProviderModel struct {
-	Host     types.String `tfsdk:"host"`
-	Token    types.String `tfsdk:"token"`
-	Username types.String `tfsdk:"username"`
-	Password types.String `tfsdk:"password"`
+	Host          types.String `tfsdk:"host"`
+	Token         types.String `tfsdk:"token"`
+	Username      types.String `tfsdk:"username"`
+	Password      types.String `tfsdk:"password"`
+	SkipTLSVerify types.Bool   `tfsdk:"skip_tls_verify"`
 }
 
 // Metadata returns the provider type name.
@@ -68,7 +69,11 @@ func (p *technitiumProvider) Schema(_ context.Context, _ provider.SchemaRequest,
 			"password": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Technitium API token. Alternatively, you can set the value using the TECHNITIUM_PASSWORD environment variable.",
+				Description: "Technitium API password. Alternatively, you can set the value using the TECHNITIUM_PASSWORD environment variable.",
+			},
+			"skip_tls_verify": schema.BoolAttribute{
+				Optional:    true,
+				Description: "Skip TLS certificate verification, e.g. for self-signed certificates. Alternatively, set TECHNITIUM_SKIP_TLS_VERIFY=true.",
 			},
 		},
 	}
@@ -102,7 +107,7 @@ func (p *technitiumProvider) Configure(ctx context.Context, req provider.Configu
 		)
 	}
 
-	if config.Token.IsUnknown() {
+	if config.Username.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("username"),
 			"Unknown Technitium DNS API username",
@@ -110,7 +115,7 @@ func (p *technitiumProvider) Configure(ctx context.Context, req provider.Configu
 		)
 	}
 
-	if config.Token.IsUnknown() {
+	if config.Password.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("password"),
 			"Unknown Technitium DNS API password",
@@ -169,30 +174,22 @@ func (p *technitiumProvider) Configure(ctx context.Context, req provider.Configu
 		return
 	}
 
-	// Get token if username and password are provided
-	if token == "" && username != "" && password != "" {
-		newToken, err := technitium.GetToken(host, username, password)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Unable to Get Technitium DNS API Token",
-				"An unexpected error occurred when retrieving the Technitium DNS API token. "+
-					"If the error is not clear, please contact the provider developers.\n\n"+
-					"Token Error: "+err.Error(),
-			)
-			return
-		}
-
-		token = newToken
+	skipTLSVerify := os.Getenv("TECHNITIUM_SKIP_TLS_VERIFY") == "true"
+	if !config.SkipTLSVerify.IsNull() {
+		skipTLSVerify = config.SkipTLSVerify.ValueBool()
 	}
 
-	client, err := technitium.NewClient(host, token, ctx)
-
+	client, err := technitium.New(ctx, technitium.Config{
+		Host:               host,
+		Token:              token,
+		Username:           username,
+		Password:           password,
+		InsecureSkipVerify: skipTLSVerify,
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Technitium DNS API Client",
-			"An unexpected error occurred when creating the Technitium DNS API client. "+
-				"If the error is not clear, please contact the provider developers.\n\n"+
-				"Client Error: "+err.Error(),
+			"Could not authenticate against the Technitium DNS API at "+host+": "+err.Error(),
 		)
 		return
 	}
@@ -210,16 +207,13 @@ func (p *technitiumProvider) DataSources(_ context.Context) []func() datasource.
 		NewDhcpScopesDataSource,
 		NewDnsZoneDataSource,
 		NewDnsZonesDataSource,
-		NewDnsZoneRecordDataSource,
-		NewDnsZoneRecordsDataSource,
 	}
 }
 
 func (p *technitiumProvider) Resources(_ context.Context) []func() resource.Resource {
-	return []func() resource.Resource{
+	return append([]func() resource.Resource{
 		NewDhcpScopeResource,
 		NewDhcpReservedLeaseResource,
 		NewDnsZoneResource,
-		NewDnsZoneRecordResource,
-	}
+	}, recordResources()...)
 }
