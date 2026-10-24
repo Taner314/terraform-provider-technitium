@@ -81,3 +81,5 @@ func (m copyFromModifier) PlanModifyString(ctx context.Context, req planmodifier
 		resp.PlanValue = v
 	}
 }
+
+func pathRoot(name string) path.Path { return path.Root(name) }

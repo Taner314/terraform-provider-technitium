@@ -45,6 +45,11 @@ data "technitium_dhcp_scope" "lan" {
 data "technitium_dhcp_scopes" "all" {
   depends_on = [technitium_dhcp_scope.lan]
 }
+
+data "technitium_dhcp_leases" "lan" {
+  scope      = technitium_dhcp_scope.lan.name
+  depends_on = [technitium_dhcp_reserved_lease.printer, technitium_dhcp_reserved_lease.nas]
+}
 `, scopeName, scopeBody, leaseIP, leaseHost)
 }
 
@@ -90,6 +95,8 @@ func TestAccDhcp(t *testing.T) {
 					resource.TestCheckResourceAttr("data.technitium_dhcp_scope.lan", "router_address", "10.30.0.1"),
 					resource.TestCheckResourceAttr("data.technitium_dhcp_scope.lan", "dns_servers.#", "2"),
 					resource.TestCheckResourceAttrSet("data.technitium_dhcp_scopes.all", "scopes.#"),
+					// Only leases claimed by clients are listed; CI has none.
+					resource.TestCheckResourceAttr("data.technitium_dhcp_leases.lan", "leases.#", "0"),
 				),
 			},
 			{ResourceName: "technitium_dhcp_scope.lan", ImportState: true, ImportStateId: "lan-acc", ImportStateVerify: true},
