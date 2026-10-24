@@ -224,5 +224,6 @@ func (p *technitiumProvider) Resources(_ context.Context) []func() resource.Reso
 		NewTsigKeyResource,
 		NewAllowedZoneResource,
 		NewBlockedZoneResource,
+		NewAppResource,
 	}, append(recordResources(), settingsResources()...)...)
 }
