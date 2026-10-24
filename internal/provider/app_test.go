@@ -1,8 +1,11 @@
 package provider
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
@@ -38,7 +41,23 @@ resource "technitium_dns_record_app" "www" {
 `, preference)
 }
 
+// skipWithoutAppStore skips when the DNS App Store is unreachable. The
+// server downloads apps itself and hangs for minutes without egress, which
+// would also break the tests that follow.
+func skipWithoutAppStore(t *testing.T) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodHead, "https://download.technitium.com/dns/apps/SplitHorizonApp-v10.zip", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Skipf("DNS App Store unreachable: %v", err)
+	}
+	_ = resp.Body.Close()
+}
+
 func TestAccApp(t *testing.T) {
+	skipWithoutAppStore(t)
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
