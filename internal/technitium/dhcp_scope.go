@@ -2,12 +2,12 @@ package technitium
 
 import (
 	"context"
-	"fmt"
 	"net/url"
-	"strings"
-
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
+
+func IsScopeNotFound(err error) bool {
+	return IsAPIError(err, "scope was not found") || IsAPIError(err, "no such dhcp scope")
+}
 
 func (c *Client) GetScopes(ctx context.Context) ([]DhcpScopeList, error) {
 	var out struct {
@@ -28,42 +28,44 @@ func (c *Client) GetScope(name string, ctx context.Context) (DhcpScope, error) {
 	return scope, err
 }
 
-func (c *Client) SetScope(s DhcpScope, oldName string, ctx context.Context) (DhcpScope, error) {
+// SetScope creates or updates scope name with params (API-named). Params not
+// given keep their current value; reserved leases are never touched unless
+// "reservedLeases" is passed.
+func (c *Client) SetScope(ctx context.Context, name string, params url.Values) error {
+	params.Set("name", name)
+	return c.Call(ctx, "/api/dhcp/scopes/set", params, nil)
+}
+
+func (c *Client) EnableScope(ctx context.Context, name string, enabled bool) error {
 	params := url.Values{}
-	params.Set("name", s.Name)
-	params.Set("startingAddress", s.StartingAddress)
-	params.Set("endingAddress", s.EndingAddress)
-	params.Set("subnetMask", s.SubnetMask)
-	params.Set("routerAddress", s.RouterAddress)
-	params.Set("useThisDnsServer", boolString(s.UseThisDnsServer))
-	params.Set("dnsServers", strings.Join(s.DnsServers, ","))
-	params.Set("domainName", s.DomainName)
-
-	if oldName != "" {
-		tflog.Debug(ctx, fmt.Sprintf("Renaming scope from %s to %s", oldName, s.Name))
-		params.Set("name", oldName)
-		params.Set("newName", s.Name)
-	} else {
-		tflog.Debug(ctx, fmt.Sprintf("Creating new scope %s", s.Name))
+	params.Set("name", name)
+	op := "disable"
+	if enabled {
+		op = "enable"
 	}
+	return c.Call(ctx, "/api/dhcp/scopes/"+op, params, nil)
+}
 
-	if s.Exclusions != nil {
-		exclusions := make([]string, 0, len(s.Exclusions))
-		for _, exclusion := range s.Exclusions {
-			exclusions = append(exclusions, exclusion.StartingAddress+"|"+exclusion.EndingAddress)
+// ScopeEnabled reports the scope's enabled flag, which only the list call returns.
+func (c *Client) ScopeEnabled(ctx context.Context, name string) (bool, bool, error) {
+	scopes, err := c.GetScopes(ctx)
+	if err != nil {
+		return false, false, err
+	}
+	for _, s := range scopes {
+		if s.Name == name {
+			return s.Enabled, true, nil
 		}
-		params.Set("exclusions", strings.Join(exclusions, "|"))
 	}
-
-	if err := c.Call(ctx, "/api/dhcp/scopes/set", params, nil); err != nil {
-		return DhcpScope{}, err
-	}
-
-	return c.GetScope(s.Name, ctx)
+	return false, false, nil
 }
 
 func (c *Client) DeleteScope(name string, ctx context.Context) error {
 	params := url.Values{}
 	params.Set("name", name)
-	return c.Call(ctx, "/api/dhcp/scopes/delete", params, nil)
+	err := c.Call(ctx, "/api/dhcp/scopes/delete", params, nil)
+	if IsScopeNotFound(err) {
+		return nil
+	}
+	return err
 }

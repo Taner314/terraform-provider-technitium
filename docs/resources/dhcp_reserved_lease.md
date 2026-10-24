@@ -3,22 +3,22 @@
 page_title: "technitium_dhcp_reserved_lease Resource - technitium"
 subcategory: ""
 description: |-
-  
+  Manages a reserved (static) lease in a DHCP scope. Changes to the address, host name or comments re-create the reservation, as the API has no update call.
 ---
 
 # technitium_dhcp_reserved_lease (Resource)
 
-
+Manages a reserved (static) lease in a DHCP scope. Changes to the address, host name or comments re-create the reservation, as the API has no update call.
 
 ## Example Usage
 
 ```terraform
-resource "technitium_dhcp_reserved_lease" "test" {
-  name             = "example"
-  hardware_address = "00:11:22:33:44:56"
-  ip_address       = "10.0.0.9"
-  host_name        = "test-host"
-  comments         = "This is a test reserved lease"
+resource "technitium_dhcp_reserved_lease" "nas" {
+  scope            = technitium_dhcp_scope.lan.name
+  hardware_address = "00:11:22:33:44:55"
+  ip_address       = "192.168.1.10"
+  host_name        = "nas"
+  comments         = "Storage"
 }
 ```
 
@@ -27,11 +27,26 @@ resource "technitium_dhcp_reserved_lease" "test" {
 
 ### Required
 
-- `hardware_address` (String)
-- `ip_address` (String)
-- `name` (String)
+- `hardware_address` (String) Client MAC address, e.g. `00:11:22:33:44:55`.
+- `ip_address` (String) Reserved IP address within the scope's subnet.
+- `scope` (String) DHCP scope name.
 
 ### Optional
 
-- `comments` (String)
-- `host_name` (String)
+- `comments` (String) Comments.
+- `host_name` (String) Host name to assign, overriding the client's.
+
+### Read-Only
+
+- `id` (String) `<scope>/<hardware_address>`; also the import ID.
+
+## Import
+
+Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
+```shell
+# <scope>/<hardware_address>
+terraform import technitium_dhcp_reserved_lease.nas lan/00:11:22:33:44:55
+```

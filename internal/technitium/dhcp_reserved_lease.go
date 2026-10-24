@@ -15,9 +15,14 @@ func (c *Client) CreateLease(s DhcpReservedLease, ctx context.Context) error {
 	return c.Call(ctx, "/api/dhcp/scopes/addReservedLease", params, nil)
 }
 
+// DeleteLease removes a reserved lease; a missing lease or scope is not an error.
 func (c *Client) DeleteLease(name string, hardwareAddress string, ctx context.Context) error {
 	params := url.Values{}
 	params.Set("name", name)
 	params.Set("hardwareAddress", hardwareAddress)
-	return c.Call(ctx, "/api/dhcp/scopes/removeReservedLease", params, nil)
+	err := c.Call(ctx, "/api/dhcp/scopes/removeReservedLease", params, nil)
+	if IsAPIError(err, "no such reserved lease") || IsScopeNotFound(err) {
+		return nil
+	}
+	return err
 }
