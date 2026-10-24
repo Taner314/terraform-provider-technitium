@@ -320,3 +320,50 @@ func recordParams(zone, domain, typ string, kv ...string) map[string][]string {
 	}
 	return params
 }
+
+func TestAccDnsRecordsDataSource(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config: testProviderConfig + `
+resource "technitium_dns_zone" "z" {
+  name = "ds-records.test"
+  type = "Primary"
+}
+
+resource "technitium_dns_record_a" "a" {
+  zone       = technitium_dns_zone.z.name
+  name       = "www"
+  ip_address = "10.0.0.1"
+}
+
+resource "technitium_dns_record_mx" "mx" {
+  zone       = technitium_dns_zone.z.name
+  name       = "@"
+  preference = 10
+  exchange   = "mail.ds-records.test"
+}
+
+data "technitium_dns_records" "www" {
+  zone       = technitium_dns_zone.z.name
+  name       = "www"
+  depends_on = [technitium_dns_record_a.a]
+}
+
+data "technitium_dns_records" "mx" {
+  zone       = technitium_dns_zone.z.name
+  type       = "MX"
+  depends_on = [technitium_dns_record_mx.mx]
+}
+`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.technitium_dns_records.www", "records.#", "1"),
+				resource.TestCheckResourceAttr("data.technitium_dns_records.www", "records.0.data.ipAddress", "10.0.0.1"),
+				resource.TestCheckResourceAttr("data.technitium_dns_records.www", "records.0.name", "www"),
+				resource.TestCheckResourceAttr("data.technitium_dns_records.mx", "records.#", "1"),
+				resource.TestCheckResourceAttr("data.technitium_dns_records.mx", "records.0.data.preference", "10"),
+				resource.TestCheckResourceAttr("data.technitium_dns_records.mx", "records.0.name", "@"),
+			),
+		}},
+	})
+}

@@ -208,6 +208,7 @@ func (p *technitiumProvider) DataSources(_ context.Context) []func() datasource.
 		NewDnsZoneDataSource,
 		NewDnsZonesDataSource,
 		NewServerInfoDataSource,
+		NewDnsRecordsDataSource,
 	}
 }
 
