@@ -1,12 +1,15 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 
 	"gitlab.com/stellivix/terraform-provider-technitium/internal/technitium"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -57,4 +60,24 @@ func ConfigureDataSourceClient(req datasource.ConfigureRequest, resp *datasource
 	}
 
 	return client
+}
+
+// copyFrom plans a computed id as the value of another string attribute, so
+// renames show the new id instead of keeping the old one.
+type copyFromModifier struct{ from path.Path }
+
+func copyFrom(attr string) planmodifier.String { return copyFromModifier{from: path.Root(attr)} }
+
+func (m copyFromModifier) Description(context.Context) string {
+	return "Set to the value of " + m.from.String() + "."
+}
+
+func (m copyFromModifier) MarkdownDescription(ctx context.Context) string { return m.Description(ctx) }
+
+func (m copyFromModifier) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	var v types.String
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, m.from, &v)...)
+	if known(v) {
+		resp.PlanValue = v
+	}
 }

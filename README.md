@@ -84,6 +84,20 @@ are identified by zone, name and their type-specific data, so several records
 of one type at one name (round-robin A, multiple TXT) are managed independently.
 Every resource supports `terraform import`; see the docs for the ID format.
 
+### Resources
+
+| Area | Resources |
+|---|---|
+| Zones | `technitium_dns_zone` |
+| Records | `technitium_dns_record_{a,aaaa,ns,cname,ptr,mx,txt,rp,srv,naptr,dname,ds,sshfp,tlsa,svcb,https,uri,caa,aname,fwd,app}` |
+| Access | `technitium_user`, `technitium_group`, `technitium_permission`, `technitium_zone_permission`, `technitium_api_token` |
+| Zone transfer | `technitium_tsig_key` |
+| Settings (singletons) | `technitium_settings_{general,rate_limiting,web_service,protocols,recursion,cache,blocking,proxy,forwarders,logging}` |
+| DHCP | `technitium_dhcp_scope`, `technitium_dhcp_reserved_lease` |
+
+Settings resources own only the attributes you set; everything else follows the
+server. Destroying one leaves the server settings unchanged.
+
 ## Provider Development
 
 1. Clone the repository
