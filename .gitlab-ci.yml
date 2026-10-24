@@ -58,8 +58,8 @@ unit:
   script:
     - go test -v -cover ./internal/technitium/
 
-# Acceptance tests against a real Technitium server. On the k8s executor
-# services share the job pod's network, so the server is on localhost.
+# Acceptance tests against a real Technitium server, reached via the service
+# alias (docker executor: linked container; k8s executor: hostAlias).
 acceptance:
   stage: test
   needs: [build]
@@ -72,7 +72,7 @@ acceptance:
         DNS_SERVER_ADMIN_PASSWORD: password
   variables:
     TF_ACC: "1"
-    TECHNITIUM_HOST: http://localhost:5380
+    TECHNITIUM_HOST: http://technitium:5380
   parallel:
     matrix:
       - TECHNITIUM_VERSION: ["14.3.0", "15.6.2"]
