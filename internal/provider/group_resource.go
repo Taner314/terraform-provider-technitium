@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -57,8 +56,9 @@ func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			},
 			"members": schema.SetAttribute{
 				Computed: true, ElementType: types.StringType,
-				Description:   "Usernames in the group (read-only).",
-				PlanModifiers: []planmodifier.Set{setplanmodifier.UseStateForUnknown()},
+				// No UseStateForUnknown: user resources change membership in the
+				// same apply.
+				Description: "Usernames in the group (read-only).",
 			},
 		},
 	}
