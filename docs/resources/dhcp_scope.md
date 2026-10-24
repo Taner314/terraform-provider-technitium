@@ -3,37 +3,32 @@
 page_title: "technitium_dhcp_scope Resource - technitium"
 subcategory: ""
 description: |-
-  The API does a lot of magic behind the scenes when creating a new scope, so most changes will require deleting and recreating the scope.
+  Manages a DHCP scope. Reserved leases are managed with technitium_dhcp_reserved_lease and are left untouched here.
 ---
 
 # technitium_dhcp_scope (Resource)
 
-The API does a lot of magic behind the scenes when creating a new scope, so most changes will require deleting and recreating the scope.
+Manages a DHCP scope. Reserved leases are managed with `technitium_dhcp_reserved_lease` and are left untouched here.
 
 ## Example Usage
 
 ```terraform
-resource "technitium_dhcp_scope" "test" {
-  name                = "Test1"
-  starting_address    = "10.0.0.2"
-  ending_address      = "10.0.0.254"
-  subnet_mask         = "255.255.255.0"
-  router_address      = "10.0.0.1"
-  domain_name         = "example"
-  use_this_dns_server = false
-  dns_servers = [
-    "1.1.1.1",
-    "8.8.8.8"
-  ]
+resource "technitium_dhcp_scope" "lan" {
+  name             = "lan"
+  enabled          = true
+  starting_address = "192.168.1.100"
+  ending_address   = "192.168.1.250"
+  subnet_mask      = "255.255.255.0"
+  router_address   = "192.168.1.1"
+  domain_name      = "lan"
+  dns_servers      = ["192.168.1.2"]
+  lease_time_days  = 7
+
   exclusions = [
-    {
-      starting_address = "10.0.0.10"
-      ending_address   = "10.0.0.40"
-    },
-    {
-      starting_address = "10.0.0.240"
-      ending_address   = "10.0.0.250"
-    }
+    { starting_address = "192.168.1.200", ending_address = "192.168.1.210" },
+  ]
+  static_routes = [
+    { destination = "10.8.0.0", subnet_mask = "255.255.0.0", router = "192.168.1.3" },
   ]
 }
 ```
@@ -43,23 +38,90 @@ resource "technitium_dhcp_scope" "test" {
 
 ### Required
 
-- `ending_address` (String)
-- `name` (String)
-- `starting_address` (String)
-- `subnet_mask` (String)
+- `ending_address` (String) Last address of the pool.
+- `name` (String) Scope name. Changing it renames the scope in place.
+- `starting_address` (String) First address of the pool.
+- `subnet_mask` (String) Subnet mask, e.g. `255.255.255.0`.
 
 ### Optional
 
-- `dns_servers` (List of String)
-- `domain_name` (String)
-- `exclusions` (Attributes List) (see [below for nested schema](#nestedatt--exclusions))
-- `router_address` (String)
-- `use_this_dns_server` (Boolean)
+- `allow_only_reserved_leases` (Boolean) Only hand out reserved leases.
+- `block_locally_administered_mac_addresses` (Boolean) Refuse dynamic leases to locally administered (randomised) MAC addresses.
+- `boot_file_name` (String) Boot file name (option 67).
+- `capwap_ac_ip_addresses` (List of String) CAPWAP access controller addresses (option 138).
+- `dns_overwrite_for_dynamic_lease` (Boolean) Let dynamic leases overwrite an existing A record with the same name.
+- `dns_servers` (List of String) DNS servers (option 6).
+- `dns_ttl` (Number) TTL of DNS records created for leases.
+- `dns_updates` (Boolean) Create forward/reverse DNS records for leases (needs `domain_name`).
+- `domain_name` (String) Domain name (option 15); enables DNS updates for leases.
+- `domain_search_list` (List of String) Domain search list (option 119).
+- `enabled` (Boolean) Whether the scope serves leases. The server needs an interface address in the subnet to answer clients.
+- `exclusions` (List of Object) Address ranges never handed out dynamically: objects with `starting_address`, `ending_address`. (see [below for nested schema](#nestedatt--exclusions))
+- `generic_options` (List of Object) Other DHCP options: objects with `code` and hex `value`. (see [below for nested schema](#nestedatt--generic_options))
+- `ignore_client_identifier_option` (Boolean) Identify clients by MAC address instead of option 61.
+- `lease_time_days` (Number) Lease time, days part. Server default: 1 day.
+- `lease_time_hours` (Number) Lease time, hours part.
+- `lease_time_minutes` (Number) Lease time, minutes part.
+- `ntp_servers` (List of String) NTP server addresses (option 42).
+- `offer_delay_time` (Number) Milliseconds to delay DHCPOFFER (for standby servers).
+- `ping_check_enabled` (Boolean) Ping an address before offering it.
+- `ping_check_retries` (Number) Ping check attempts.
+- `ping_check_timeout` (Number) Ping check timeout in milliseconds.
+- `router_address` (String) Default gateway (option 3).
+- `server_address` (String) Next server / TFTP address for network boot (siaddr).
+- `server_host_name` (String) Boot server host name (option 66).
+- `static_routes` (List of Object) Classless static routes (option 121): objects with `destination`, `subnet_mask`, `router`. (see [below for nested schema](#nestedatt--static_routes))
+- `tftp_server_addresses` (List of String) TFTP / VoIP configuration server addresses (option 150).
+- `use_this_dns_server` (Boolean) Hand out this server as DNS server; `dns_servers` is then ignored.
+- `vendor_info` (List of Object) Vendor-specific information: objects with `identifier` (vendor class match) and `information` (hex). (see [below for nested schema](#nestedatt--vendor_info))
+- `wins_servers` (List of String) WINS/NBNS servers (option 44).
+
+### Read-Only
+
+- `id` (String) Scope name.
 
 <a id="nestedatt--exclusions"></a>
 ### Nested Schema for `exclusions`
 
-Required:
+Optional:
 
 - `ending_address` (String)
 - `starting_address` (String)
+
+
+<a id="nestedatt--generic_options"></a>
+### Nested Schema for `generic_options`
+
+Optional:
+
+- `code` (Number)
+- `value` (String)
+
+
+<a id="nestedatt--static_routes"></a>
+### Nested Schema for `static_routes`
+
+Optional:
+
+- `destination` (String)
+- `router` (String)
+- `subnet_mask` (String)
+
+
+<a id="nestedatt--vendor_info"></a>
+### Nested Schema for `vendor_info`
+
+Optional:
+
+- `identifier` (String)
+- `information` (String)
+
+## Import
+
+Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
+```shell
+terraform import technitium_dhcp_scope.lan lan
+```

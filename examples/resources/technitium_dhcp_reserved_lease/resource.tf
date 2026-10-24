@@ -1,7 +1,7 @@
-resource "technitium_dhcp_reserved_lease" "test" {
-  name             = "example"
-  hardware_address = "00:11:22:33:44:56"
-  ip_address       = "10.0.0.9"
-  host_name        = "test-host"
-  comments         = "This is a test reserved lease"
+resource "technitium_dhcp_reserved_lease" "nas" {
+  scope            = technitium_dhcp_scope.lan.name
+  hardware_address = "00:11:22:33:44:55"
+  ip_address       = "192.168.1.10"
+  host_name        = "nas"
+  comments         = "Storage"
 }

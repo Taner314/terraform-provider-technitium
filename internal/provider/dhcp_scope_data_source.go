@@ -39,7 +39,7 @@ func (d *dhcpScopeDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 // Read refreshes the Terraform state with the latest data.
 func (d *dhcpScopeDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 
-	var state dhcpScope
+	var state dhcpScopeDataModel
 	diags := resp.State.Get(ctx, &state)
 
 	resp.Diagnostics.Append(diags...)
@@ -57,7 +57,7 @@ func (d *dhcpScopeDataSource) Read(ctx context.Context, req datasource.ReadReque
 	}
 
 	// Map response body to model
-	data := dhcpScope{
+	data := dhcpScopeDataModel{
 		Name:             types.StringValue(scope.Name),
 		StartingAddress:  types.StringValue(scope.StartingAddress),
 		EndingAddress:    types.StringValue(scope.EndingAddress),
@@ -105,4 +105,16 @@ func (d *dhcpScopeDataSource) Configure(_ context.Context, req datasource.Config
 	}
 
 	d.client = client
+}
+
+type dhcpScopeDataModel struct {
+	Name             types.String   `tfsdk:"name"`
+	StartingAddress  types.String   `tfsdk:"starting_address"`
+	EndingAddress    types.String   `tfsdk:"ending_address"`
+	SubnetMask       types.String   `tfsdk:"subnet_mask"`
+	RouterAddress    types.String   `tfsdk:"router_address"`
+	UseThisDnsServer types.Bool     `tfsdk:"use_this_dns_server"`
+	DnsServers       []types.String `tfsdk:"dns_servers"`
+	DomainName       types.String   `tfsdk:"domain_name"`
+	Exclusions       []Exclusion    `tfsdk:"exclusions"`
 }
