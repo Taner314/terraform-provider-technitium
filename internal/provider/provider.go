@@ -215,5 +215,11 @@ func (p *technitiumProvider) Resources(_ context.Context) []func() resource.Reso
 		NewDhcpScopeResource,
 		NewDhcpReservedLeaseResource,
 		NewDnsZoneResource,
-	}, recordResources()...)
+		NewUserResource,
+		NewGroupResource,
+		NewPermissionResource,
+		NewZonePermissionResource,
+		NewAPITokenResource,
+		NewTsigKeyResource,
+	}, append(recordResources(), settingsResources()...)...)
 }

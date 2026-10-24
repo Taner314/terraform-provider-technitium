@@ -1,0 +1,1 @@
+terraform import technitium_user.external_dns external-dns
