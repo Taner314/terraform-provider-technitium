@@ -96,10 +96,11 @@ Every resource supports `terraform import`; see the docs for the ID format.
 | Zone transfer | `technitium_tsig_key` |
 | Settings (singletons) | `technitium_settings_{general,rate_limiting,web_service,protocols,recursion,cache,blocking,proxy,forwarders,logging}` |
 | DHCP | `technitium_dhcp_scope`, `technitium_dhcp_reserved_lease` |
-| Clustering | `technitium_cluster`, `technitium_cluster_secondary` |
 
 Data sources: `technitium_dns_zone`, `technitium_dns_zones`, `technitium_dns_records`,
-`technitium_dhcp_scope`, `technitium_dhcp_scopes`, `technitium_dhcp_leases`, `technitium_server_info`.
+`technitium_dhcp_scope`, `technitium_dhcp_scopes`, `technitium_dhcp_leases`, `technitium_server_info`,
+`technitium_cluster` (read-only: clusters are set up in the web console, since a cluster syncs most
+config from its Primary and initializing it restarts the web service).
 
 Settings resources own only the attributes you set; everything else follows the
 server. Destroying one leaves the server settings unchanged.
@@ -135,8 +136,6 @@ TECHNITIUM_HOST=http://localhost:5380 make testacc   # acceptance tests
 ```
 
 CI (`.gitlab-ci.yml`) runs the acceptance suite against Technitium 14.x and 15.x with both Terraform and OpenTofu.
-The two-node cluster test runs when `TECHNITIUM_SECONDARY_HOST`, `TECHNITIUM_PRIMARY_IP` and
-`TECHNITIUM_SECONDARY_IP` are set.
 
 ### Releasing
 

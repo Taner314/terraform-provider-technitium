@@ -2,11 +2,15 @@ package technitium
 
 import (
 	"context"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 type captured struct {
@@ -119,5 +123,57 @@ func TestParamNamesHidesValues(t *testing.T) {
 	names := paramNames(params)
 	if strings.Join(names, ",") != "pass,user" {
 		t.Errorf("paramNames = %v", names)
+	}
+}
+
+func TestCallRetriesWhileServerRestarts(t *testing.T) {
+	restartPoll = 50 * time.Millisecond
+	defer func() { restartPoll = 2 * time.Second }()
+
+	// Reserve a port, close it so connections are refused, then start the
+	// server on it shortly after.
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := l.Addr().String()
+	_ = l.Close()
+
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		l2, err := net.Listen("tcp", addr)
+		if err != nil {
+			return
+		}
+		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"status":"ok","response":{}}`))
+		})}
+		t.Cleanup(func() { _ = srv.Close() })
+		_ = srv.Serve(l2)
+	}()
+
+	c := &Client{HostURL: "http://" + addr, HTTPClient: &http.Client{Timeout: 5 * time.Second}, Token: "tok"}
+	if err := c.Call(context.Background(), "/api/x", nil, nil); err != nil {
+		t.Fatalf("Call after restart = %v", err)
+	}
+}
+
+func TestRetryable(t *testing.T) {
+	reset := &net.OpError{Op: "read", Err: syscall.ECONNRESET}
+	refused := &net.OpError{Op: "dial", Err: syscall.ECONNREFUSED}
+	for _, tt := range []struct {
+		err      error
+		endpoint string
+		want     bool
+	}{
+		{refused, "/api/zones/records/add", true},
+		{reset, "/api/user/login", true},
+		{reset, "/api/zones/records/get", true},
+		{reset, "/api/zones/records/add", false},
+		{errors.New("boom"), "/api/zones/records/get", false},
+	} {
+		if got := retryable(tt.err, tt.endpoint); got != tt.want {
+			t.Errorf("retryable(%v, %s) = %v, want %v", tt.err, tt.endpoint, got, tt.want)
+		}
 	}
 }

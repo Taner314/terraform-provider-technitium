@@ -51,3 +51,18 @@ data "technitium_dns_zones" "test" {
 	})
 
 }
+
+// Read-only cluster state; CI servers aren't clustered.
+func TestAccClusterDataSource(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config: testProviderConfig + `data "technitium_cluster" "this" {}`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.technitium_cluster.this", "initialized", "false"),
+				resource.TestCheckResourceAttr("data.technitium_cluster.this", "nodes.#", "0"),
+				resource.TestCheckResourceAttrSet("data.technitium_cluster.this", "server_domain"),
+			),
+		}},
+	})
+}

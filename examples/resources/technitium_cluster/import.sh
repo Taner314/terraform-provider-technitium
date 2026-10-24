@@ -1,1 +1,0 @@
-terraform import technitium_cluster.this cluster

@@ -208,6 +208,7 @@ func (p *technitiumProvider) DataSources(_ context.Context) []func() datasource.
 		NewDnsZoneDataSource,
 		NewDnsZonesDataSource,
 		NewServerInfoDataSource,
+		NewClusterDataSource,
 		NewDnsRecordsDataSource,
 		NewDhcpLeasesDataSource,
 	}
@@ -229,7 +230,5 @@ func (p *technitiumProvider) Resources(_ context.Context) []func() resource.Reso
 		NewAppResource,
 		NewSsoResource,
 		NewDnssecResource,
-		NewClusterResource,
-		NewClusterSecondaryResource,
 	}, append(recordResources(), settingsResources()...)...)
 }
