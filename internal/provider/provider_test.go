@@ -13,7 +13,10 @@ var (
 	// CLI command executed to create a provider server to which the CLI can
 	// reattach.
 	testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-		"technitium": providerserver.NewProtocol6WithError(New("test")()),
+		// A fresh provider per call: aliases must not share one instance.
+		"technitium": func() (tfprotov6.ProviderServer, error) {
+			return providerserver.NewProtocol6WithError(New("test")())()
+		},
 	}
 )
 

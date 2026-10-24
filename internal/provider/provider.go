@@ -229,5 +229,7 @@ func (p *technitiumProvider) Resources(_ context.Context) []func() resource.Reso
 		NewAppResource,
 		NewSsoResource,
 		NewDnssecResource,
+		NewClusterResource,
+		NewClusterSecondaryResource,
 	}, append(recordResources(), settingsResources()...)...)
 }
