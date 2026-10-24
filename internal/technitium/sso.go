@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"time"
 )
 
 type SsoGroupMapping struct {
@@ -39,5 +38,5 @@ func (c *Client) SetSsoConfig(ctx context.Context, params url.Values) (SsoConfig
 	if err := c.Call(ctx, "/api/admin/sso/set", params, &out); err != nil {
 		return out, err
 	}
-	return out, c.WaitReady(ctx, 90*time.Second)
+	return out, c.WaitRestart(ctx)
 }

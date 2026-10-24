@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -27,6 +28,37 @@ type Client struct {
 	// longClient serves calls where the server does slow work (downloads,
 	// signing, cluster sync); nil falls back to HTTPClient.
 	longClient HttpClient
+}
+
+var (
+	restartGrace = 60 * time.Second
+	restartPoll  = 2 * time.Second
+)
+
+// retryable: a refused connection never reached the server, so any call
+// may be retried. A reset or EOF may have been processed, so only calls
+// without side effects are retried then.
+func retryable(err error, endpoint string) bool {
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return true
+	}
+	if !errors.Is(err, syscall.ECONNRESET) && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return false
+	}
+	return readOnly(endpoint)
+}
+
+func readOnly(endpoint string) bool {
+	switch endpoint {
+	case "/api/user/login", "/api/user/session/get":
+		return true
+	}
+	for _, suffix := range []string{"/get", "/list", "/state", "/export", "/listStoreApps", "/viewDS"} {
+		if strings.HasSuffix(endpoint, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 // LongTimeout bounds calls made with CallLong.
@@ -168,6 +200,29 @@ func (c *Client) CallLong(ctx context.Context, endpoint string, params url.Value
 	return c.call(ctx, hc, endpoint, params, out)
 }
 
+// WaitRestart is for calls that make the server restart its web service
+// asynchronously after answering: wait briefly for the API to go away, then
+// for it to come back. If it never drops, there was no restart.
+func (c *Client) WaitRestart(ctx context.Context) error {
+	for drop := time.Now().Add(15 * time.Second); time.Now().Before(drop); {
+		pctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		_, err := c.post(pctx, noRetry{c.HTTPClient}, "/api/user/session/get", nil)
+		cancel()
+		if err != nil && !IsAPIError(err, "") {
+			break // down: now wait for it to return
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+	return c.WaitReady(ctx, 2*time.Minute)
+}
+
+// noRetry marks a client whose connection errors must surface immediately.
+type noRetry struct{ HttpClient }
+
 // WaitReady polls until the API answers, e.g. after a web service restart.
 func (c *Client) WaitReady(ctx context.Context, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
@@ -222,21 +277,36 @@ func (c *Client) post(ctx context.Context, hc HttpClient, endpoint string, param
 		form.Set("token", c.Token)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.HostURL+endpoint, strings.NewReader(form.Encode()))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-	if c.Token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.Token)
-	}
-
 	tflog.Debug(ctx, "technitium API call", map[string]any{"endpoint": endpoint, "params": paramNames(params)})
 
-	res, err := hc.Do(req)
-	if err != nil {
-		return nil, err
+	// The web service restarts after some changes (cluster, SSO, TLS). A
+	// refused connection means the request was never sent, so retrying is
+	// safe even for writes.
+	var res *http.Response
+	deadline := time.Now().Add(restartGrace)
+	for {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.HostURL+endpoint, strings.NewReader(form.Encode()))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Accept", "application/json")
+		if c.Token != "" {
+			req.Header.Set("Authorization", "Bearer "+c.Token)
+		}
+
+		res, err = hc.Do(req)
+		if err == nil {
+			break
+		}
+		if _, probe := hc.(noRetry); probe || !retryable(err, endpoint) || time.Now().After(deadline) {
+			return nil, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(restartPoll):
+		}
 	}
 	defer res.Body.Close()
 

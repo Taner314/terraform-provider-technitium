@@ -51,7 +51,8 @@ func (c *Client) ListStoreApps(ctx context.Context) ([]StoreApp, error) {
 	var out struct {
 		StoreApps []StoreApp `json:"storeApps"`
 	}
-	err := c.Call(ctx, "/api/apps/listStoreApps", nil, &out)
+	// The server fetches the store index from the internet here.
+	err := c.CallLong(ctx, "/api/apps/listStoreApps", nil, &out)
 	return out.StoreApps, err
 }
 
