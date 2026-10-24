@@ -37,7 +37,6 @@ resource "technitium_settings_recursion" "this" {
 
 resource "technitium_settings_forwarders" "this" {
   forwarders = ` + forwarders + `
-  protocol   = "Udp"
 }
 
 resource "technitium_settings_blocking" "this" {
@@ -89,6 +88,40 @@ resource "technitium_settings_general" "this" {
 					resource.TestCheckResourceAttr("technitium_settings_forwarders.this", "forwarders.#", "0"),
 					resource.TestCheckResourceAttr("technitium_settings_rate_limiting.this", "ipv4_prefix_limits.#", "0"),
 				),
+			},
+			{
+				// Protocol alone is sent together with the existing forwarders.
+				Config: testProviderConfig + `
+resource "technitium_settings_forwarders" "this" {
+  forwarders = ["1.1.1.1"]
+}`,
+			},
+			{
+				Config: testProviderConfig + `
+resource "technitium_settings_forwarders" "this" {
+  protocol = "Tls"
+}`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("technitium_settings_forwarders.this", "protocol", "Tls"),
+					// Unconfigured: follows the server, which added the TLS port.
+					resource.TestCheckResourceAttr("technitium_settings_forwarders.this", "forwarders.0", "1.1.1.1:853"),
+				),
+			},
+			{
+				// Configured without the default port: no diff.
+				Config: testProviderConfig + `
+resource "technitium_settings_forwarders" "this" {
+  forwarders = ["1.1.1.1", "dns.quad9.net (9.9.9.9)"]
+  protocol   = "Tls"
+}`,
+				Check: resource.TestCheckResourceAttr("technitium_settings_forwarders.this", "forwarders.1", "dns.quad9.net (9.9.9.9)"),
+			},
+			{
+				Config: testProviderConfig + `
+resource "technitium_settings_forwarders" "this" {
+  forwarders = []
+  protocol   = "Udp"
+}`,
 			},
 			{
 				// Turn the proxy off so other tests aren't affected.
