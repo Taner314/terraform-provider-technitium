@@ -2,123 +2,157 @@ package technitium
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
+	"net/url"
 	"strings"
 )
 
+type DnsZoneList struct {
+	Name         string `json:"name"`
+	Type         string `json:"type"`
+	Disabled     bool   `json:"disabled"`
+	DnssecStatus string `json:"dnssecStatus"`
+	SoaSerial    int    `json:"soaSerial"`
+	Expiry       string `json:"expiry,omitempty"`
+	IsExpired    bool   `json:"isExpired,omitempty"`
+	LastModified string `json:"lastModified"`
+	Internal     bool   `json:"internal"`
+	Catalog      string `json:"catalog"`
+}
+
+type UpdateSecurityPolicy struct {
+	TsigKeyName  string   `json:"tsigKeyName"`
+	Domain       string   `json:"domain"`
+	AllowedTypes []string `json:"allowedTypes"`
+}
+
+// DnsZone is the response of /api/zones/options/get. Pointer fields are only
+// present for some zone types.
+type DnsZone struct {
+	Name                               string                 `json:"name"`
+	Type                               string                 `json:"type"`
+	Internal                           bool                   `json:"internal"`
+	Disabled                           bool                   `json:"disabled"`
+	DnssecStatus                       string                 `json:"dnssecStatus"`
+	NotifyFailed                       bool                   `json:"notifyFailed"`
+	NotifyFailedFor                    []string               `json:"notifyFailedFor"`
+	Catalog                            *string                `json:"catalog"`
+	OverrideCatalogQueryAccess         *bool                  `json:"overrideCatalogQueryAccess"`
+	OverrideCatalogZoneTransfer        *bool                  `json:"overrideCatalogZoneTransfer"`
+	OverrideCatalogNotify              *bool                  `json:"overrideCatalogNotify"`
+	PrimaryNameServerAddresses         []string               `json:"primaryNameServerAddresses"`
+	PrimaryZoneTransferProtocol        *string                `json:"primaryZoneTransferProtocol"`
+	PrimaryZoneTransferTsigKeyName     *string                `json:"primaryZoneTransferTsigKeyName"`
+	ValidateZone                       *bool                  `json:"validateZone"`
+	QueryAccess                        *string                `json:"queryAccess"`
+	QueryAccessNetworkACL              []string               `json:"queryAccessNetworkACL"`
+	ZoneTransfer                       *string                `json:"zoneTransfer"`
+	ZoneTransferNetworkACL             []string               `json:"zoneTransferNetworkACL"`
+	ZoneTransferTsigKeyNames           []string               `json:"zoneTransferTsigKeyNames"`
+	Notify                             *string                `json:"notify"`
+	NotifyNameServers                  []string               `json:"notifyNameServers"`
+	NotifySecondaryCatalogsNameServers []string               `json:"notifySecondaryCatalogsNameServers"`
+	Update                             *string                `json:"update"`
+	UpdateNetworkACL                   []string               `json:"updateNetworkACL"`
+	UpdateSecurityPolicies             []UpdateSecurityPolicy `json:"updateSecurityPolicies"`
+}
+
+type DnsZoneCreate struct {
+	Name                       string
+	Type                       string
+	Catalog                    string
+	UseSoaSerialDateScheme     bool
+	PrimaryNameServerAddresses []string
+	ZoneTransferProtocol       string
+	TsigKeyName                string
+	ValidateZone               bool
+	Protocol                   string
+	Forwarder                  string
+	InitializeForwarder        bool
+	DnssecValidation           bool
+}
+
 func (c *Client) GetDnsZones(ctx context.Context) ([]DnsZoneList, error) {
-	url := fmt.Sprintf("%s/api/zones/list", c.HostURL)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
+	var out struct {
+		Zones []DnsZoneList `json:"zones"`
+	}
+	if err := c.Call(ctx, "/api/zones/list", nil, &out); err != nil {
 		return nil, err
 	}
-
-	body, err := c.doRequest(req, ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	//tflog.Debug(ctx, string(body))
-
-	response := DnsZonesResponse{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return nil, err
-	}
-
-	return response.Response.Zones, nil
+	return out.Zones, nil
 }
 
 func (c *Client) GetDnsZone(name string, ctx context.Context) (DnsZone, error) {
-	url := fmt.Sprintf("%s/api/zones/options/get?zone=%s", c.HostURL, name)
+	params := url.Values{}
+	params.Set("zone", name)
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return DnsZone{}, err
-	}
-
-	body, err := c.doRequest(req, ctx)
-	if err != nil {
-		return DnsZone{}, err
-	}
-
-	response := DnsZoneResponse{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return DnsZone{}, err
-	}
-
-	return response.Response, nil
+	var zone DnsZone
+	err := c.Call(ctx, "/api/zones/options/get", params, &zone)
+	return zone, err
 }
 
-func (c *Client) CreateDnsZone(z DnsZoneCreate, ctx context.Context) (DnsZone, error) {
+// IsZoneNotFound reports whether err means the zone does not exist.
+func IsZoneNotFound(err error) bool {
+	return IsAPIError(err, "no such zone") || IsAPIError(err, "zone was not found")
+}
 
-	req, err := c.GetRequest("/api/zones/create")
-
-	if err != nil {
-		return DnsZone{}, err
-	}
-
-	params := req.URL.Query()
-
-	params.Add("zone", z.Name)
-	params.Add("type", z.Type)
+func (c *Client) CreateDnsZone(z DnsZoneCreate, ctx context.Context) (string, error) {
+	params := url.Values{}
+	params.Set("zone", z.Name)
+	params.Set("type", z.Type)
 	addIfSet(params, "catalog", z.Catalog)
-	params.Add("useSoaSerialDateScheme", fmt.Sprintf("%v", z.UseSoaSerialDateScheme))
+	if z.UseSoaSerialDateScheme {
+		params.Set("useSoaSerialDateScheme", "true")
+	}
 	addIfSet(params, "primaryNameServerAddresses", strings.Join(z.PrimaryNameServerAddresses, ","))
 	addIfSet(params, "zoneTransferProtocol", z.ZoneTransferProtocol)
 	addIfSet(params, "tsigKeyName", z.TsigKeyName)
-	addIfSet(params, "protocol", z.Protocol)
-	addIfSet(params, "forwarder", z.Forwarder)
-	params.Add("initializeForwarder", fmt.Sprintf("%v", z.InitializeForwarder))
-	params.Add("dnssecValidation", fmt.Sprintf("%v", z.DnssecValidation))
-
-	req.URL.RawQuery = params.Encode()
-
-	body, err := c.doRequest(req, ctx)
-	if err != nil {
-		return DnsZone{}, err
+	if z.ValidateZone {
+		params.Set("validateZone", "true")
+	}
+	if z.Type == "Forwarder" {
+		params.Set("initializeForwarder", boolString(z.InitializeForwarder))
+		addIfSet(params, "protocol", z.Protocol)
+		addIfSet(params, "forwarder", z.Forwarder)
+		if z.DnssecValidation {
+			params.Set("dnssecValidation", "true")
+		}
 	}
 
-	response := DnsZoneCreateResponse{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return DnsZone{}, err
+	var out struct {
+		Domain string `json:"domain"`
 	}
-
-	if response.Status != "ok" {
-		return DnsZone{}, fmt.Errorf("failed to create scope: %s", response.ErrorMessage)
+	if err := c.Call(ctx, "/api/zones/create", params, &out); err != nil {
+		return "", err
 	}
+	// For reverse zones created from an IP/CIDR the server picks the name.
+	if out.Domain == "" {
+		out.Domain = z.Name
+	}
+	return out.Domain, nil
+}
 
-	return c.GetDnsZone(z.Name, ctx)
-
+// SetDnsZoneOptions sends params (already API-named) to /api/zones/options/set.
+func (c *Client) SetDnsZoneOptions(ctx context.Context, zone string, params url.Values) error {
+	if params == nil {
+		params = url.Values{}
+	}
+	params.Set("zone", zone)
+	return c.Call(ctx, "/api/zones/options/set", params, nil)
 }
 
 func (c *Client) DeleteDnsZone(name string, ctx context.Context) error {
-	url := fmt.Sprintf("%s/api/zones/delete?zone=%s", c.HostURL, name)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return err
+	params := url.Values{}
+	params.Set("zone", name)
+	err := c.Call(ctx, "/api/zones/delete", params, nil)
+	if IsZoneNotFound(err) {
+		return nil
 	}
+	return err
+}
 
-	body, err := c.doRequest(req, ctx)
-	if err != nil {
-		return err
+func boolString(b bool) string {
+	if b {
+		return "true"
 	}
-
-	response := BaseResponse{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return err
-	}
-
-	if response.Status != "ok" {
-		return fmt.Errorf("failed to delete zone: %s", response.ErrorMessage)
-	}
-
-	return nil
+	return "false"
 }

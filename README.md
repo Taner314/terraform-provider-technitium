@@ -6,6 +6,9 @@ Tested against Technitium v14.x and v15.x.
 Forked from [kenske/terraform-provider-technitium](https://github.com/kenske/terraform-provider-technitium) (MIT).
 Not yet published to a public registry; see [Provider Development](#provider-development) for local use.
 
+> **0.x, breaking changes expected.** Resource schemas differ from upstream: the single
+> `technitium_dns_zone_record` resource was replaced by one resource per record type.
+
 ## Getting Started
 
 Add the provider to your Terraform configuration:
@@ -36,7 +39,7 @@ Alternatively, the values can be set using the `TECHNITIUM_HOST` and
 
 Complete example:
 
-```hcl  
+```hcl
 terraform {
   required_providers {
     technitium = {
@@ -50,70 +53,36 @@ provider "technitium" {
   token = var.TECHNITIUM_TOKEN
 }
 
-resource "technitium_dhcp_scope" "test" {
-  name                = "Test1"
-  starting_address    = "10.0.0.2"
-  ending_address      = "10.0.0.254"
-  subnet_mask         = "255.255.255.0"
-  router_address      = "10.0.0.1"
-  domain_name         = "local"
-  use_this_dns_server = false
-  dns_servers = [
-    "1.1.1.1",
-    "8.8.8.8"
-  ]
-  exclusions = [
-    {
-      starting_address = "10.0.0.10"
-      ending_address   = "10.0.0.40"
-    },
-    {
-      starting_address = "10.0.0.240"
-      ending_address   = "10.0.0.250"
-    }
-  ]
-}
-
-resource "technitium_dhcp_reserved_lease" "test" {
-  name             = technitium_dhcp_scope.test.name
-  hardware_address = "00:11:22:33:44:56"
-  ip_address       = "10.0.0.9"
-  host_name        = "test-host"
-  comments         = "This is a test reserved lease"
-}
-
-
 resource "technitium_dns_zone" "example" {
-  name                       = "example.com"
-  type                       = "Primary"
-  use_soa_serial_date_scheme = true
+  name = "example.com"
+  type = "Primary"
 }
 
-resource "technitium_dns_zone_record" "cname" {
-  zone     = technitium_dns_zone.example.name
-  domain   = "cname.${technitium_dns_zone.example.name}"
-  type     = "CNAME"
-  cname    = "other.example.com"
-  comments = "This is a test CNAME record"
-  ttl      = "420"
-
-  depends_on = [technitium_dns_zone.example]
-
+resource "technitium_dns_record_a" "www" {
+  zone       = technitium_dns_zone.example.name
+  name       = "www"
+  ip_address = "192.168.1.10"
+  ttl        = 300
 }
 
-resource "technitium_dns_zone_record" "a" {
-  domain     = "testa.example3.com"
-  type       = "A"
-  ip_address = "1.1.1.1"
-  comments   = "This is a test A record"
-  ttl        = "420"
-
-  depends_on = [technitium_dns_zone.example]
-
+resource "technitium_dns_record_cname" "docs" {
+  zone  = technitium_dns_zone.example.name
+  name  = "docs"
+  cname = "www.example.com"
 }
 
-
+resource "technitium_dns_record_mx" "mail" {
+  zone       = technitium_dns_zone.example.name
+  name       = "@"
+  preference = 10
+  exchange   = "mail.example.com"
+}
 ```
+
+Each record type has its own resource (`technitium_dns_record_<type>`). Records
+are identified by zone, name and their type-specific data, so several records
+of one type at one name (round-robin A, multiple TXT) are managed independently.
+Every resource supports `terraform import`; see the docs for the ID format.
 
 ## Provider Development
 

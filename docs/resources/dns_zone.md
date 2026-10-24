@@ -3,12 +3,12 @@
 page_title: "technitium_dns_zone Resource - technitium"
 subcategory: ""
 description: |-
-  
+  Manages an authoritative zone and its options. Options left unset follow the server's current value; only the options valid for the zone type should be set.
 ---
 
 # technitium_dns_zone (Resource)
 
-
+Manages an authoritative zone and its options. Options left unset follow the server's current value; only the options valid for the zone `type` should be set.
 
 ## Example Usage
 
@@ -17,17 +17,20 @@ resource "technitium_dns_zone" "example" {
   name                       = "example.com"
   type                       = "Primary"
   use_soa_serial_date_scheme = true
+
+  zone_transfer = "Deny"
+  update        = "Deny"
 }
 
-resource "technitium_dns_zone" "internal" {
-  name      = "internal-example.com"
-  type      = "Forwarder"
-  forwarder = "this-server"
-}
-
-resource "technitium_dns_zone" "ptr" {
+resource "technitium_dns_zone" "reverse" {
   name = "1.168.192.in-addr.arpa"
   type = "Primary"
+}
+
+# Conditional forwarder zone; forwarders are managed as FWD records.
+resource "technitium_dns_zone" "corp" {
+  name = "corp.internal"
+  type = "Forwarder"
 }
 ```
 
@@ -36,17 +39,58 @@ resource "technitium_dns_zone" "ptr" {
 
 ### Required
 
-- `name` (String)
-- `type` (String) The type of DNS zone. Valid values are [`Primary`, `Secondary`, `Stub`, `Forwarder`, `SecondaryForwarder`, `Catalog`, `SecondaryCatalog`]
+- `name` (String) Zone name. For reverse zones use the `in-addr.arpa`/`ip6.arpa` name.
+- `type` (String) `Primary`, `Secondary`, `Stub`, `Forwarder`, `SecondaryForwarder`, `Catalog` or `SecondaryCatalog`.
 
 ### Optional
 
-- `catalog` (String)
-- `dnssec_validation` (Boolean)
-- `forwarder` (String) The address of the DNS server to be used as a forwarder. This optional parameter is required to be used with Conditional Forwarder zones. A special value `this-server` can be used as a forwarder which when used will forward all the requests internally to this DNS server such that you can override the zone with records and rest of the zone gets resolved via this server. The `initialize_forwarder` parameter must be set to `true` to use this option.
-- `initialize_forwarder` (Boolean) Set value as true to initialize the Conditional Forwarder zone with an FWD record or set it to false to create an empty Forwarder zone. Default value is `true`
-- `primary_name_server_addresses` (List of String)
-- `protocol` (String) The DNS transport protocol to be used by the Conditional Forwarder zone.This optional parameter is used with Conditional Forwarder zones.Valid values are [`Udp`, `Tcp`, `Tls`, `Https`, `Quic`].Default is `Udp`
+- `catalog` (String) Catalog zone this zone is a member of; empty string for none.
+- `disabled` (Boolean) Whether the zone is disabled.
+- `dnssec_validation` (Boolean) DNSSEC validation for the initial FWD record.
+- `forwarder` (String) `Forwarder` zones: create the zone with this initial FWD record. Prefer `technitium_dns_record_fwd` to manage forwarders.
+- `forwarder_protocol` (String) Protocol of the initial FWD record: `Udp`, `Tcp`, `Tls`, `Https` or `Quic`.
+- `notify` (String) `None`, `ZoneNameServers`, `SpecifiedNameServers`, `BothZoneAndSpecifiedNameServers` or `SeparateNameServersForCatalogAndMemberZones`.
+- `notify_name_servers` (List of String) Name server addresses to notify.
+- `notify_secondary_catalogs_name_servers` (List of String) `Catalog` zones: addresses notified only for catalog updates.
+- `override_catalog_notify` (Boolean) Override the catalog zone's notify setting.
+- `override_catalog_query_access` (Boolean) Override the catalog zone's query access setting.
+- `override_catalog_zone_transfer` (Boolean) Override the catalog zone's zone transfer setting.
+- `primary_name_server_addresses` (List of String) `Secondary`/`Stub` zones: primary name server addresses.
+- `primary_zone_transfer_protocol` (String) `Secondary` zones: `Tcp`, `Tls` or `Quic`.
+- `primary_zone_transfer_tsig_key_name` (String) `Secondary` zones: TSIG key used for zone transfer.
+- `query_access` (String) `Deny`, `Allow`, `AllowOnlyPrivateNetworks`, `AllowOnlyZoneNameServers`, `UseSpecifiedNetworkACL` or `AllowZoneNameServersAndUseSpecifiedNetworkACL`.
+- `query_access_network_acl` (List of String) Ordered ACL for query access; prefix an entry with `!` to deny.
+- `update` (String) Dynamic updates (RFC 2136): `Deny`, `Allow`, `AllowOnlyZoneNameServers`, `UseSpecifiedNetworkACL` or `AllowZoneNameServersAndUseSpecifiedNetworkACL`.
+- `update_network_acl` (List of String) Ordered ACL for dynamic updates.
+- `update_security_policies` (List of Object) Dynamic update policies: objects with `tsig_key_name`, `domain` (wildcards allowed) and `allowed_types`. (see [below for nested schema](#nestedatt--update_security_policies))
+- `use_soa_serial_date_scheme` (Boolean) Use the YYYYMMDDnn SOA serial scheme (`Primary`, `Forwarder`, `Catalog`). Applied at creation.
+- `validate_zone` (Boolean) `Secondary` zones: validate with ZONEMD after each transfer.
+- `zone_transfer` (String) `Deny`, `Allow`, `AllowOnlyZoneNameServers`, `UseSpecifiedNetworkACL` or `AllowZoneNameServersAndUseSpecifiedNetworkACL`.
+- `zone_transfer_network_acl` (List of String) Ordered ACL for zone transfer.
+- `zone_transfer_tsig_key_names` (List of String) TSIG key names allowed to transfer the zone.
+
+### Read-Only
+
+- `dnssec_status` (String) DNSSEC status, e.g. `Unsigned`.
+- `id` (String) Zone name.
+- `internal` (Boolean) Whether the zone is a server-internal zone.
+
+<a id="nestedatt--update_security_policies"></a>
+### Nested Schema for `update_security_policies`
+
+Optional:
+
+- `allowed_types` (List of String)
+- `domain` (String)
 - `tsig_key_name` (String)
-- `use_soa_serial_date_scheme` (Boolean)
-- `zone_transfer_protocol` (String)
+
+## Import
+
+Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
+```shell
+# Zones are imported by name.
+terraform import technitium_dns_zone.example example.com
+```

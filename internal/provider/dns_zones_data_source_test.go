@@ -2,17 +2,27 @@ package provider
 
 import (
 	"fmt"
-	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"gitlab.com/stellivix/terraform-provider-technitium/internal/test"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+const zonesListResponse = `{"status":"ok","response":{"zones":[
+{"name":"0.in-addr.arpa","type":"Primary","lastModified":"2026-10-24T19:58:47.7116736Z","disabled":false,"soaSerial":1,"internal":true,"catalog":null,"dnssecStatus":"Unsigned"},
+{"name":"example.com","type":"Primary","lastModified":"2026-10-24T19:58:47.7116736Z","disabled":false,"soaSerial":3,"internal":false,"catalog":null,"dnssecStatus":"Unsigned"}]}}`
 
 func TestDnsZonesDataSource(t *testing.T) {
 
-	scenario := test.GetMockScenarioFromFile(t, "../test/mocks/dns_zones_response.json", http.StatusOK)
-	server := test.NewTestServer(scenario)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/zones/list" {
+			_, _ = w.Write([]byte(zonesListResponse))
+			return
+		}
+		_, _ = w.Write([]byte(`{"status":"ok","response":{}}`))
+	}))
 	defer server.Close()
 
 	config := fmt.Sprintf(`
@@ -38,7 +48,7 @@ provider "technitium" {
 					resource.TestCheckResourceAttr("data.technitium_dns_zones.test", "zones.0.expiry", ""),
 					resource.TestCheckResourceAttr("data.technitium_dns_zones.test", "zones.0.is_expired", "false"),
 					resource.TestCheckResourceAttr("data.technitium_dns_zones.test", "zones.0.internal", "true"),
-					resource.TestCheckResourceAttr("data.technitium_dns_zones.test", "zones.#", "6"),
+					resource.TestCheckResourceAttr("data.technitium_dns_zones.test", "zones.#", "2"),
 
 					resource.TestCheckResourceAttrWith(
 						"data.technitium_dns_zones.test",

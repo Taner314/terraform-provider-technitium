@@ -40,7 +40,8 @@ provider "technitium" {
 ### Optional
 
 - `host` (String) Technitium API host URL. Alternatively, you can set the value using the TECHNITIUM_HOST environment variable.
-- `password` (String, Sensitive) Technitium API token. Alternatively, you can set the value using the TECHNITIUM_PASSWORD environment variable.
+- `password` (String, Sensitive) Technitium API password. Alternatively, you can set the value using the TECHNITIUM_PASSWORD environment variable.
+- `skip_tls_verify` (Boolean) Skip TLS certificate verification, e.g. for self-signed certificates. Alternatively, set TECHNITIUM_SKIP_TLS_VERIFY=true.
 - `token` (String, Sensitive) Technitium API token. Alternatively, you can set the value using the TECHNITIUM_TOKEN environment variable.
 - `username` (String) Technitium API username. Alternatively, you can set the value using the TECHNITIUM_USERNAME environment variable.
 
