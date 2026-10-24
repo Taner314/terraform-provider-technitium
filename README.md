@@ -88,12 +88,18 @@ Every resource supports `terraform import`; see the docs for the ID format.
 
 | Area | Resources |
 |---|---|
-| Zones | `technitium_dns_zone` |
+| Zones | `technitium_dns_zone`, `technitium_dns_zone_dnssec` |
 | Records | `technitium_dns_record_{a,aaaa,ns,cname,ptr,mx,txt,rp,srv,naptr,dname,ds,sshfp,tlsa,svcb,https,uri,caa,aname,fwd,app}` |
-| Access | `technitium_user`, `technitium_group`, `technitium_permission`, `technitium_zone_permission`, `technitium_api_token` |
+| Blocking | `technitium_blocked_zone`, `technitium_allowed_zone` (block list URLs: `technitium_settings_blocking`) |
+| Apps | `technitium_app` |
+| Access | `technitium_user`, `technitium_group`, `technitium_permission`, `technitium_zone_permission`, `technitium_api_token`, `technitium_sso` |
 | Zone transfer | `technitium_tsig_key` |
 | Settings (singletons) | `technitium_settings_{general,rate_limiting,web_service,protocols,recursion,cache,blocking,proxy,forwarders,logging}` |
 | DHCP | `technitium_dhcp_scope`, `technitium_dhcp_reserved_lease` |
+| Clustering | `technitium_cluster`, `technitium_cluster_secondary` |
+
+Data sources: `technitium_dns_zone`, `technitium_dns_zones`, `technitium_dns_records`,
+`technitium_dhcp_scope`, `technitium_dhcp_scopes`, `technitium_dhcp_leases`, `technitium_server_info`.
 
 Settings resources own only the attributes you set; everything else follows the
 server. Destroying one leaves the server settings unchanged.
@@ -129,4 +135,12 @@ TECHNITIUM_HOST=http://localhost:5380 make testacc   # acceptance tests
 ```
 
 CI (`.gitlab-ci.yml`) runs the acceptance suite against Technitium 14.x and 15.x with both Terraform and OpenTofu.
+The two-node cluster test runs when `TECHNITIUM_SECONDARY_HOST`, `TECHNITIUM_PRIMARY_IP` and
+`TECHNITIUM_SECONDARY_IP` are set.
+
+### Releasing
+
+Push a `vX.Y.Z` tag. GoReleaser builds the provider and attaches it to a GitLab release. Set the
+`GPG_PRIVATE_KEY` (and optionally `GPG_PASSPHRASE`) CI variables to sign the checksums, which the
+public Terraform/OpenTofu registries require.
 

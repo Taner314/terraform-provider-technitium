@@ -207,6 +207,9 @@ func (p *technitiumProvider) DataSources(_ context.Context) []func() datasource.
 		NewDhcpScopesDataSource,
 		NewDnsZoneDataSource,
 		NewDnsZonesDataSource,
+		NewServerInfoDataSource,
+		NewDnsRecordsDataSource,
+		NewDhcpLeasesDataSource,
 	}
 }
 
@@ -221,5 +224,12 @@ func (p *technitiumProvider) Resources(_ context.Context) []func() resource.Reso
 		NewZonePermissionResource,
 		NewAPITokenResource,
 		NewTsigKeyResource,
+		NewAllowedZoneResource,
+		NewBlockedZoneResource,
+		NewAppResource,
+		NewSsoResource,
+		NewDnssecResource,
+		NewClusterResource,
+		NewClusterSecondaryResource,
 	}, append(recordResources(), settingsResources()...)...)
 }

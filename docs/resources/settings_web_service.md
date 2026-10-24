@@ -20,6 +20,7 @@ This is a singleton: declare it once. Attributes left unset follow the server's 
 
 ### Optional
 
+- `csp_frame_ancestors` (String) CSP `frame-ancestors` value for the web console, e.g. `'none'` or `'self' https://dash.example.com`.
 - `enable_http3` (Boolean) Enable HTTP/3.
 - `enable_http_unix_socket` (Boolean) Listen on an HTTP Unix socket.
 - `enable_tls` (Boolean) Enable HTTPS.

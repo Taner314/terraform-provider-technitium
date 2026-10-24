@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -45,7 +46,10 @@ type settingField struct {
 	kind      settingKind
 	desc      string
 	sensitive bool
-	writeOnly bool // the server doesn't return it
+	writeOnly bool                // the server doesn't return it
+	aliases   []string            // older/newer names of key, tried in order
+	with      string              // attr that must be sent in the same request for this one to apply
+	normElem  func(string) string // list element normaliser; equal lists keep the configured spelling
 }
 
 type settingsSpec struct {
@@ -108,12 +112,71 @@ func lookup(s technitium.Settings, p string) any {
 	return cur
 }
 
+// resolve returns the param name this server uses for f and whether the
+// server has the setting at all (fields come and go between versions).
+func (f settingField) resolve(s technitium.Settings) (key, path string, ok bool) {
+	for _, k := range append([]string{f.key}, f.aliases...) {
+		p := k
+		if f.get != "" && k == f.key {
+			p = f.get
+		}
+		if _, present := s[strings.SplitN(p, ".", 2)[0]]; present {
+			return k, p, true
+		}
+	}
+	return f.key, "", false
+}
+
+func sameNormalized(a, b attr.Value, norm func(string) string) bool {
+	al, ok1 := a.(types.List)
+	bl, ok2 := b.(types.List)
+	if !ok1 || !ok2 || !known(al) || !known(bl) || len(al.Elements()) != len(bl.Elements()) {
+		return false
+	}
+	be := bl.Elements()
+	for i, e := range al.Elements() {
+		if norm(stringOf(e)) != norm(stringOf(be[i])) {
+			return false
+		}
+	}
+	return true
+}
+
+// normForwarder drops the default DNS ports the server appends (53 for
+// UDP/TCP, 853 for TLS/QUIC) wherever they appear: "1.1.1.1:853",
+// "dns.quad9.net:853 (9.9.9.9)", "name (9.9.9.9:853)".
+var defaultPortRe = regexp.MustCompile(`:(53|853)(\s|\)|$)`)
+
+func normForwarder(s string) string {
+	return defaultPortRe.ReplaceAllString(strings.ToLower(strings.TrimSpace(s)), "$2")
+}
+
+func nullSetting(f settingField) attr.Value {
+	switch f.kind {
+	case sInt:
+		return types.Int64Null()
+	case sBool:
+		return types.BoolNull()
+	case sStrList, sIntList, sQpmList:
+		return types.ListNull(f.elemType())
+	default:
+		return types.StringNull()
+	}
+}
+
+func serverVersion(s technitium.Settings) string {
+	if v, ok := s["version"].(string); ok {
+		return v
+	}
+	return "this version"
+}
+
 // fromSettings converts a response value; null becomes the empty value so
 // "unset" and "empty" compare equal.
 func (f settingField) fromSettings(s technitium.Settings) (attr.Value, diag.Diagnostics) {
-	p := f.key
-	if f.get != "" {
-		p = f.get
+	_, p, ok := f.resolve(s)
+	if !ok {
+		return nullSetting(f), nil
 	}
 	raw := lookup(s, p)
 
@@ -308,12 +371,42 @@ func (r *settingsResource) apply(ctx context.Context, plan, state map[string]att
 		if prev != nil && known(prev) && p.Equal(prev) {
 			continue
 		}
+		key, _, supported := f.resolve(current)
+		if !supported && !f.writeOnly {
+			diags.AddAttributeError(path.Root(f.attr), "Setting not supported",
+				fmt.Sprintf("`%s` is not available on Technitium %s.", f.attr, serverVersion(current)))
+			continue
+		}
 		v, d := f.encode(ctx, p)
 		diags.Append(d...)
-		params.Set(f.key, v)
+		params.Set(key, v)
 	}
 	if diags.HasError() {
 		return diags
+	}
+
+	// Some params are ignored unless their partner is in the same request.
+	for _, f := range r.spec.fields {
+		if f.with == "" || !params.Has(f.key) {
+			continue
+		}
+		for _, partner := range r.spec.fields {
+			if partner.attr != f.with || params.Has(partner.key) {
+				continue
+			}
+			v := plan[partner.attr]
+			if !known(v) {
+				v, _ = partner.fromSettings(current)
+			}
+			if l, ok := v.(types.List); ok && len(l.Elements()) == 0 {
+				diags.AddAttributeError(path.Root(f.attr), "Missing "+partner.attr,
+					fmt.Sprintf("`%s` only takes effect when `%s` is not empty.", f.attr, partner.attr))
+				return diags
+			}
+			enc, d := partner.encode(ctx, v)
+			diags.Append(d...)
+			params.Set(partner.key, enc)
+		}
 	}
 
 	if len(params) > 0 {
@@ -342,6 +435,9 @@ func (r *settingsResource) write(ctx context.Context, st attrSetter, s technitiu
 			var d diag.Diagnostics
 			v, d = f.fromSettings(s)
 			diags.Append(d...)
+			if f.normElem != nil && sameNormalized(keep[f.attr], v, f.normElem) {
+				v = keep[f.attr]
+			}
 		}
 		diags.Append(st.SetAttribute(ctx, path.Root(f.attr), v)...)
 	}

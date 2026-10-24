@@ -29,8 +29,8 @@ resource "technitium_settings_forwarders" "this" {
 
 - `concurrency` (Number) Forwarders queried concurrently.
 - `concurrent_forwarding` (Boolean) Query forwarders concurrently.
-- `forwarders` (List of String) Forwarder addresses, e.g. `1.1.1.1`, `dns.quad9.net (9.9.9.9:853)`, `https://cloudflare-dns.com/dns-query`.
-- `protocol` (String) `Udp`, `Tcp`, `Tls`, `Https` or `Quic`.
+- `forwarders` (List of String) Forwarder addresses, e.g. `1.1.1.1`, `dns.quad9.net (9.9.9.9:853)`, `https://cloudflare-dns.com/dns-query`. Default ports may be omitted.
+- `protocol` (String) `Udp`, `Tcp`, `Tls`, `Https` or `Quic`. Requires `forwarders`; with no forwarders the server resets it to `Udp`.
 - `retries` (Number) Retries per forwarder.
 - `timeout` (Number) Timeout per query in milliseconds.
 

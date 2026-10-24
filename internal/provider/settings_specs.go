@@ -2,6 +2,9 @@ package provider
 
 import "github.com/hashicorp/terraform-plugin-framework/resource"
 
+// Attributes a server version doesn't have read as null; setting one is an
+// error naming the version.
+
 func str(attr, key, desc string) settingField {
 	return settingField{attr: attr, key: key, kind: sStr, desc: desc}
 }
@@ -38,7 +41,7 @@ var settingsSpecs = []*settingsSpec{
 			list("notify_allowed_networks", "notifyAllowedNetworks", "Networks allowed to NOTIFY all secondary zones."),
 			flag("enable_check_for_update", "dnsServerEnableCheckForUpdate", "Check for server updates."),
 			flag("apps_enable_automatic_update", "dnsAppsEnableAutomaticUpdate", "Update installed DNS apps automatically."),
-			str("ipv6_mode", "ipv6Mode", "IPv6 mode, e.g. `Disabled`, `Enabled` or `Preferred`."),
+			str("ipv6_mode", "ipv6Mode", "IPv6 mode: `Disabled`, `Enabled` or `Preferred` (replaces the legacy `preferIPv6` flag)."),
 			flag("enable_udp_socket_pool", "enableUdpSocketPool", "Use a pool of random UDP ports for outbound queries."),
 			{attr: "socket_pool_excluded_ports", key: "socketPoolExcludedPorts", kind: sIntList, desc: "Ports excluded from the UDP socket pool."},
 			num("udp_payload_size", "udpPayloadSize", "EDNS UDP payload size."),
@@ -86,6 +89,7 @@ var settingsSpecs = []*settingsSpec{
 			secret("tls_certificate_password", "webServiceTlsCertificatePassword", "Certificate password. Not readable from the server."),
 			list("reverse_proxy_addresses", "webServiceReverseProxyAddresses", "Reverse proxies whose real-IP header is trusted."),
 			str("real_ip_header", "webServiceRealIpHeader", "Header carrying the client IP from a reverse proxy."),
+			str("csp_frame_ancestors", "webServiceCspFrameAncestorsHeader", "CSP `frame-ancestors` value for the web console, e.g. `'none'` or `'self' https://dash.example.com`."),
 			flag("enable_http_unix_socket", "webServiceEnableHttpUnixSocket", "Listen on an HTTP Unix socket."),
 			str("http_unix_socket", "webServiceHttpUnixSocket", "HTTP Unix socket path."),
 			flag("enable_tls_unix_socket", "webServiceEnableTlsUnixSocket", "Listen on a TLS Unix socket."),
@@ -110,7 +114,8 @@ var settingsSpecs = []*settingsSpec{
 			flag("enable_dns_over_quic", "enableDnsOverQuic", "Enable DNS-over-QUIC."),
 			num("dns_over_quic_port", "dnsOverQuicPort", "DNS-over-QUIC port."),
 			flag("enable_dns_over_http_help_redirect", "enableDnsOverHttpHelpRedirect", "Redirect browsers hitting the DoH endpoint to a help page."),
-			list("reverse_proxy_network_acl", "dnsReverseProxyNetworkACL", "Proxies allowed to use the PROXY-protocol and DoH-over-HTTP listeners."),
+			{attr: "reverse_proxy_network_acl", key: "dnsReverseProxyNetworkACL", aliases: []string{"reverseProxyNetworkACL"}, kind: sStrList,
+				desc: "Proxies allowed to use the PROXY-protocol and DoH-over-HTTP listeners."},
 			str("tls_certificate_path", "dnsTlsCertificatePath", "Path to a PKCS #12 (.pfx) certificate for DoT/DoH/DoQ."),
 			secret("tls_certificate_password", "dnsTlsCertificatePassword", "Certificate password. Not readable from the server."),
 			str("real_ip_header", "dnsOverHttpRealIpHeader", "Header carrying the client IP for DNS-over-HTTP."),
@@ -153,6 +158,8 @@ var settingsSpecs = []*settingsSpec{
 			flag("enable_prefetch", "enableCachePrefetch", "Prefetch popular records before they expire."),
 			num("prefetch_eligibility", "cachePrefetchEligibility", "Hits per hour needed for prefetch."),
 			num("prefetch_trigger", "cachePrefetchTrigger", "Remaining TTL in seconds that triggers prefetch."),
+			num("prefetch_sample_interval_minutes", "cachePrefetchSampleIntervalInMinutes", "Technitium 14 only: prefetch sampling interval in minutes."),
+			num("prefetch_sample_eligibility_hits_per_hour", "cachePrefetchSampleEligibilityHitsPerHour", "Technitium 14 only: hits per hour for prefetch sampling."),
 		},
 	},
 	{
@@ -185,8 +192,12 @@ var settingsSpecs = []*settingsSpec{
 		name: "forwarders",
 		desc: "Manages server-wide forwarders. With no forwarders the server resolves recursively.",
 		fields: []settingField{
-			list("forwarders", "forwarders", "Forwarder addresses, e.g. `1.1.1.1`, `dns.quad9.net (9.9.9.9:853)`, `https://cloudflare-dns.com/dns-query`."),
-			str("protocol", "forwarderProtocol", "`Udp`, `Tcp`, `Tls`, `Https` or `Quic`."),
+			// forwarders and protocol must always be sent together: either
+			// alone resets the other's effect on the server.
+			{attr: "forwarders", key: "forwarders", kind: sStrList, normElem: normForwarder, with: "protocol",
+				desc: "Forwarder addresses, e.g. `1.1.1.1`, `dns.quad9.net (9.9.9.9:853)`, `https://cloudflare-dns.com/dns-query`. Default ports may be omitted."},
+			{attr: "protocol", key: "forwarderProtocol", kind: sStr, with: "forwarders",
+				desc: "`Udp`, `Tcp`, `Tls`, `Https` or `Quic`. Requires `forwarders`; with no forwarders the server resets it to `Udp`."},
 			flag("concurrent_forwarding", "concurrentForwarding", "Query forwarders concurrently."),
 			num("retries", "forwarderRetries", "Retries per forwarder."),
 			num("timeout", "forwarderTimeout", "Timeout per query in milliseconds."),
