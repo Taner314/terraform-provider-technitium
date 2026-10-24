@@ -27,6 +27,8 @@ This is a singleton: declare it once. Attributes left unset follow the server's 
 - `minimum_record_ttl` (Number) Minimum TTL applied to cached records.
 - `negative_record_ttl` (Number) TTL for negative answers.
 - `prefetch_eligibility` (Number) Hits per hour needed for prefetch.
+- `prefetch_sample_eligibility_hits_per_hour` (Number) Technitium 14 only: hits per hour for prefetch sampling.
+- `prefetch_sample_interval_minutes` (Number) Technitium 14 only: prefetch sampling interval in minutes.
 - `prefetch_trigger` (Number) Remaining TTL in seconds that triggers prefetch.
 - `save_cache` (Boolean) Persist the cache across restarts.
 - `serve_stale` (Boolean) Serve expired records when upstreams fail (RFC 8767).

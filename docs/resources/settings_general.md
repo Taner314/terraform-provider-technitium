@@ -37,7 +37,7 @@ This is a singleton: declare it once. Attributes left unset follow the server's 
 - `enable_edns_client_subnet_source_address` (Boolean) Treat the ECS address in requests as the client address (for DNS proxies).
 - `enable_udp_socket_pool` (Boolean) Use a pool of random UDP ports for outbound queries.
 - `ipv4_source_addresses` (List of String) IPv4 source addresses for outbound queries.
-- `ipv6_mode` (String) IPv6 mode, e.g. `Disabled`, `Enabled` or `Preferred`.
+- `ipv6_mode` (String) IPv6 mode: `Disabled`, `Enabled` or `Preferred` (replaces the legacy `preferIPv6` flag).
 - `ipv6_source_addresses` (List of String) IPv6 source addresses for outbound queries.
 - `listen_backlog` (Number) Maximum pending inbound connections.
 - `local_end_points` (List of String) Listen addresses with port, e.g. `0.0.0.0:53`, `[::]:53`.

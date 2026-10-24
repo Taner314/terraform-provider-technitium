@@ -24,7 +24,13 @@ type Client struct {
 	HostURL    string
 	HTTPClient HttpClient
 	Token      string
+	// longClient serves calls where the server does slow work (downloads,
+	// signing, cluster sync); nil falls back to HTTPClient.
+	longClient HttpClient
 }
+
+// LongTimeout bounds calls made with CallLong.
+const LongTimeout = 10 * time.Minute
 
 type Config struct {
 	Host               string
@@ -83,6 +89,7 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 		HostURL:    strings.TrimRight(cfg.Host, "/"),
 		HTTPClient: &http.Client{Timeout: cfg.Timeout, Transport: transport},
 		Token:      cfg.Token,
+		longClient: &http.Client{Timeout: LongTimeout, Transport: transport},
 	}
 
 	if c.Token == "" {
@@ -126,7 +133,7 @@ func (c *Client) Login(ctx context.Context, username, password string) (string, 
 		Token string `json:"token"`
 	}
 	// The login call returns the token at the top level, not under "response".
-	raw, err := c.post(ctx, "/api/user/login", params)
+	raw, err := c.post(ctx, c.HTTPClient, "/api/user/login", params)
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +156,39 @@ func (c *Client) GetSessionInfo(ctx context.Context) error {
 // Call POSTs params as a form to endpoint and decodes the "response" object
 // into out (which may be nil).
 func (c *Client) Call(ctx context.Context, endpoint string, params url.Values, out any) error {
-	raw, err := c.post(ctx, endpoint, params)
+	return c.call(ctx, c.HTTPClient, endpoint, params, out)
+}
+
+// CallLong is Call for slow server-side operations.
+func (c *Client) CallLong(ctx context.Context, endpoint string, params url.Values, out any) error {
+	hc := c.longClient
+	if hc == nil {
+		hc = c.HTTPClient
+	}
+	return c.call(ctx, hc, endpoint, params, out)
+}
+
+// WaitReady polls until the API answers, e.g. after a web service restart.
+func (c *Client) WaitReady(ctx context.Context, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		err := c.GetSessionInfo(ctx)
+		if err == nil {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("web service did not come back: %w", err)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+func (c *Client) call(ctx context.Context, hc HttpClient, endpoint string, params url.Values, out any) error {
+	raw, err := c.post(ctx, hc, endpoint, params)
 	if err != nil {
 		return err
 	}
@@ -172,7 +211,7 @@ func (c *Client) Call(ctx context.Context, endpoint string, params url.Values, o
 
 // post performs the request, checks the status envelope and returns the raw
 // body.
-func (c *Client) post(ctx context.Context, endpoint string, params url.Values) ([]byte, error) {
+func (c *Client) post(ctx context.Context, hc HttpClient, endpoint string, params url.Values) ([]byte, error) {
 	form := url.Values{}
 	for k, v := range params {
 		form[k] = v
@@ -195,7 +234,7 @@ func (c *Client) post(ctx context.Context, endpoint string, params url.Values) (
 
 	tflog.Debug(ctx, "technitium API call", map[string]any{"endpoint": endpoint, "params": paramNames(params)})
 
-	res, err := c.HTTPClient.Do(req)
+	res, err := hc.Do(req)
 	if err != nil {
 		return nil, err
 	}

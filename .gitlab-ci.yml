@@ -1,12 +1,14 @@
 stages:
   - build
   - test
+  - release
 
 variables:
   GO_IMAGE: golang:1.26
   TERRAFORM_VERSION: "1.17.0"
   TOFU_VERSION: "1.13.2"
   GOLANGCI_LINT_VERSION: v2.15.0
+  GORELEASER_VERSION: v2.19.0
   GOPATH: $CI_PROJECT_DIR/.go
   GOFLAGS: -mod=readonly
 
@@ -98,3 +100,33 @@ acceptance:
       curl -sf -d user=admin -d pass=password "$TECHNITIUM_HOST/api/user/login" >/dev/null || { echo "Technitium not ready"; exit 1; }
   script:
     - go test -v -cover -count=1 ./internal/provider/
+
+# Tag vX.Y.Z to release. Set GPG_PRIVATE_KEY (armored, masked/protected) and
+# optionally GPG_PASSPHRASE to sign SHA256SUMS as the Terraform registry
+# requires; without a key the release is built unsigned.
+release:
+  stage: release
+  image:
+    name: goreleaser/goreleaser:$GORELEASER_VERSION
+    entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+  variables:
+    GIT_DEPTH: 0
+    GITLAB_TOKEN: $CI_JOB_TOKEN
+  script:
+    - |
+      SKIP=""
+      if [ -n "$GPG_PRIVATE_KEY" ]; then
+        echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+        export GPG_FINGERPRINT=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr/ {print $10; exit}')
+        if [ -n "$GPG_PASSPHRASE" ]; then
+          echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent reloadagent /bye
+          echo "$GPG_PASSPHRASE" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --sign -o /dev/null /dev/null
+        fi
+      else
+        echo "No GPG_PRIVATE_KEY set: building an unsigned release"
+        SKIP="--skip=sign"
+      fi
+      goreleaser release --clean $SKIP

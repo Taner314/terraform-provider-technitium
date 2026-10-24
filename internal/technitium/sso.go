@@ -39,17 +39,5 @@ func (c *Client) SetSsoConfig(ctx context.Context, params url.Values) (SsoConfig
 	if err := c.Call(ctx, "/api/admin/sso/set", params, &out); err != nil {
 		return out, err
 	}
-	deadline := time.Now().Add(90 * time.Second)
-	for {
-		if err := c.GetSessionInfo(ctx); err == nil {
-			return out, nil
-		} else if time.Now().After(deadline) {
-			return out, fmt.Errorf("web service did not come back after SSO change: %w", err)
-		}
-		select {
-		case <-ctx.Done():
-			return out, ctx.Err()
-		case <-time.After(2 * time.Second):
-		}
-	}
+	return out, c.WaitReady(ctx, 90*time.Second)
 }

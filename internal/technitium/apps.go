@@ -78,7 +78,7 @@ func (c *Client) DownloadApp(ctx context.Context, name, zipURL string, update bo
 	if update {
 		op = "downloadAndUpdate"
 	}
-	return c.Call(ctx, "/api/apps/"+op, params, nil)
+	return c.CallLong(ctx, "/api/apps/"+op, params, nil)
 }
 
 func (c *Client) UninstallApp(ctx context.Context, name string) error {

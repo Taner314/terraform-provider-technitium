@@ -42,7 +42,7 @@ func zoneParam(zone string) url.Values {
 
 func (c *Client) SignZone(ctx context.Context, zone string, params url.Values) error {
 	params.Set("zone", zone)
-	return c.Call(ctx, "/api/zones/dnssec/sign", params, nil)
+	return c.CallLong(ctx, "/api/zones/dnssec/sign", params, nil)
 }
 
 func (c *Client) UnsignZone(ctx context.Context, zone string) error {

@@ -111,9 +111,11 @@ func TestAccSettings_everyFieldWrites(t *testing.T) {
 func alternative(f settingField, name string, cur attr.Value) (attr.Value, bool) {
 	switch f.kind {
 	case sBool:
-		return types.BoolValue(!cur.(types.Bool).ValueBool()), true
+		b, _ := cur.(types.Bool)
+		return types.BoolValue(!b.ValueBool()), true
 	case sInt:
-		n := cur.(types.Int64).ValueInt64()
+		i, _ := cur.(types.Int64)
+		n := i.ValueInt64()
 		if atMax[name] {
 			return types.Int64Value(n - 1), true
 		}

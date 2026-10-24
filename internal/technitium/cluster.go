@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type ClusterNode struct {
@@ -49,14 +50,20 @@ func (c *Client) InitCluster(ctx context.Context, domain string, ips []string) (
 	p.Set("clusterDomain", domain)
 	p.Set("primaryNodeIpAddresses", strings.Join(ips, ","))
 	var out ClusterState
-	err := c.Call(ctx, "/api/admin/cluster/init", p, &out)
-	return out, err
+	if err := c.CallLong(ctx, "/api/admin/cluster/init", p, &out); err != nil {
+		return out, err
+	}
+	// Init enables HTTPS and restarts the web service.
+	return out, c.WaitReady(ctx, 2*time.Minute)
 }
 
 func (c *Client) DeleteCluster(ctx context.Context, force bool) error {
 	p := url.Values{}
 	p.Set("forceDelete", strconv.FormatBool(force))
-	return c.Call(ctx, "/api/admin/cluster/primary/delete", p, nil)
+	if err := c.CallLong(ctx, "/api/admin/cluster/primary/delete", p, nil); err != nil {
+		return err
+	}
+	return c.WaitReady(ctx, 2*time.Minute)
 }
 
 func (c *Client) SetClusterOptions(ctx context.Context, p url.Values) (ClusterState, error) {
@@ -91,12 +98,17 @@ func (c *Client) JoinCluster(ctx context.Context, j JoinCluster) (ClusterState, 
 	p.Set("primaryNodePassword", j.PrimaryNodePassword)
 	addIfSet(p, "primaryNodeTotp", j.PrimaryNodeTotp)
 	var out ClusterState
-	err := c.Call(ctx, "/api/admin/cluster/initJoin", p, &out)
-	return out, err
+	if err := c.CallLong(ctx, "/api/admin/cluster/initJoin", p, &out); err != nil {
+		return out, err
+	}
+	return out, c.WaitReady(ctx, 2*time.Minute)
 }
 
 func (c *Client) LeaveCluster(ctx context.Context, force bool) error {
 	p := url.Values{}
 	p.Set("forceLeave", strconv.FormatBool(force))
-	return c.Call(ctx, "/api/admin/cluster/secondary/leave", p, nil)
+	if err := c.CallLong(ctx, "/api/admin/cluster/secondary/leave", p, nil); err != nil {
+		return err
+	}
+	return c.WaitReady(ctx, 2*time.Minute)
 }
