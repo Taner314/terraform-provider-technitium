@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gitlab.com/stellivix/terraform-provider-technitium/internal/test"
 	"net/http"
 	"reflect"
 	"strings"
-	"terraform-provider-technitium/internal/test"
 	"testing"
 )
 

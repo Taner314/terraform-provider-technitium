@@ -3,7 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
-	"terraform-provider-technitium/internal/technitium"
+	"gitlab.com/stellivix/terraform-provider-technitium/internal/technitium"
+	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -79,7 +80,10 @@ func setStringIfNotEmpty(target *types.String, value string) {
 }
 
 func updateZoneRecord(ctx context.Context) error {
-	host := "http://localhost:5380"
+	host := os.Getenv("TECHNITIUM_HOST")
+	if host == "" {
+		host = "http://localhost:5380"
+	}
 	username := "admin"
 	password := "password"
 

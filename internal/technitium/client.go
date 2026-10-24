@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -43,8 +44,10 @@ func GetToken(host string, username string, password string) (string, error) {
 		return "", fmt.Errorf("username and password must be provided")
 	}
 
-	url := fmt.Sprintf("%s/api/user/login?user=%s&pass=%s", host, username, password)
-	resp, err := http.Get(url)
+	form := url.Values{}
+	form.Set("user", username)
+	form.Set("pass", password)
+	resp, err := http.PostForm(fmt.Sprintf("%s/api/user/login", host), form)
 	if err != nil {
 		return "", err
 	}
@@ -59,14 +62,21 @@ func GetToken(host string, username string, password string) (string, error) {
 		return "", err
 	}
 
-	var result map[string]string
+	var result struct {
+		BaseResponse
+		Token string `json:"token"`
+	}
 	err = json.Unmarshal(body, &result)
 	if err != nil {
 		return "", err
 	}
 
-	token, ok := result["token"]
-	if !ok {
+	if result.Status != "ok" {
+		return "", fmt.Errorf("failed to get token: %s", result.ErrorMessage)
+	}
+
+	token := result.Token
+	if token == "" {
 		return "", fmt.Errorf("token not found in response")
 	}
 

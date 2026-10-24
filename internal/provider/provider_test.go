@@ -21,7 +21,6 @@ func TestProviderAuthWithUsernameAndPassword(t *testing.T) {
 
 	providerConfig := `
 provider "technitium" {
-  host = "http://localhost:5380"
   username = "admin"
   password = "password"
 }
@@ -31,7 +30,16 @@ provider "technitium" {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: providerConfig + `data "technitium_dns_zones" "test" {}`,
+				Config: providerConfig + `
+resource "technitium_dns_zone" "auth" {
+  name = "auth-test.example"
+  type = "Primary"
+}
+
+data "technitium_dns_zones" "test" {
+  depends_on = [technitium_dns_zone.auth]
+}`,
+				// v15+ hides internal zones from the list, so seed one
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.technitium_dns_zones.test", "zones.#"),
 				),

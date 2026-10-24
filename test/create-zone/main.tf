@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     technitium = {
-      source = "kenske/technitium"
+      source = "stellivix/technitium"
     }
   }
 }

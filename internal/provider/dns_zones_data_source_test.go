@@ -3,8 +3,8 @@ package provider
 import (
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"gitlab.com/stellivix/terraform-provider-technitium/internal/test"
 	"net/http"
-	"terraform-provider-technitium/internal/test"
 	"testing"
 	"time"
 )

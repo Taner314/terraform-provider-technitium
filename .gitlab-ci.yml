@@ -1,0 +1,100 @@
+stages:
+  - build
+  - test
+
+variables:
+  GO_IMAGE: golang:1.26
+  TERRAFORM_VERSION: "1.17.0"
+  TOFU_VERSION: "1.13.2"
+  GOLANGCI_LINT_VERSION: v2.15.0
+  GOPATH: $CI_PROJECT_DIR/.go
+  GOFLAGS: -mod=readonly
+
+default:
+  image: $GO_IMAGE
+  cache:
+    key:
+      files: [go.sum]
+    paths: [.go/pkg/mod/]
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+.install_terraform: &install_terraform
+  - apt-get update -qq && apt-get install -qq -y unzip >/dev/null
+  - curl -sSfLo /tmp/tf.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+  - unzip -qo /tmp/tf.zip -d /usr/local/bin terraform
+
+build:
+  stage: build
+  script:
+    - go build -v ./...
+    - test -z "$(gofmt -s -l . | grep -v '^.go/')" || { gofmt -s -l .; echo "run 'make fmt'"; exit 1; }
+    - go vet ./...
+
+lint:
+  stage: build
+  image: golangci/golangci-lint:$GOLANGCI_LINT_VERSION
+  script:
+    - golangci-lint run ./...
+
+# Docs in docs/ are generated; fail if they are stale.
+generate:
+  stage: build
+  before_script:
+    - *install_terraform
+  script:
+    - make generate
+    - git diff --compact-summary --exit-code || { echo "Run 'make generate' and commit."; exit 1; }
+
+unit:
+  stage: test
+  needs: [build]
+  script:
+    - go test -v -cover ./internal/technitium/
+
+# Acceptance tests against a real Technitium server, reached via the service
+# alias (docker executor: linked container; k8s executor: hostAlias).
+acceptance:
+  stage: test
+  needs: [build]
+  timeout: 20m
+  services:
+    - name: technitium/dns-server:$TECHNITIUM_VERSION
+      alias: technitium
+      variables:
+        DNS_SERVER_DOMAIN: dns-server
+        DNS_SERVER_ADMIN_PASSWORD: password
+  variables:
+    TF_ACC: "1"
+    TECHNITIUM_HOST: http://technitium:5380
+  parallel:
+    matrix:
+      - TECHNITIUM_VERSION: ["14.3.0", "15.6.2"]
+        TF_CLI: [terraform, tofu]
+  before_script:
+    - |
+      if [ "$TF_CLI" = tofu ]; then
+        apt-get update -qq && apt-get install -qq -y unzip >/dev/null
+        curl -sSfLo /tmp/tofu.zip "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_amd64.zip"
+        unzip -qo /tmp/tofu.zip -d /usr/local/bin tofu
+        export TF_ACC_TERRAFORM_PATH=/usr/local/bin/tofu TF_ACC_PROVIDER_HOST=registry.opentofu.org
+      else
+        apt-get update -qq && apt-get install -qq -y unzip >/dev/null
+        curl -sSfLo /tmp/tf.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+        unzip -qo /tmp/tf.zip -d /usr/local/bin terraform
+        export TF_ACC_TERRAFORM_PATH=/usr/local/bin/terraform
+      fi
+    - |
+      for i in $(seq 90); do
+        curl -sf -d user=admin -d pass=password "$TECHNITIUM_HOST/api/user/login" >/dev/null && break
+        sleep 2
+      done
+      curl -sf -d user=admin -d pass=password "$TECHNITIUM_HOST/api/user/login" >/dev/null || { echo "Technitium not ready"; exit 1; }
+  script:
+    - go test -v -cover -count=1 ./internal/provider/

@@ -9,7 +9,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"terraform-provider-technitium/internal/provider"
+	"gitlab.com/stellivix/terraform-provider-technitium/internal/provider"
 )
 
 var (
@@ -28,7 +28,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/kenske/technitium",
+		Address: "registry.terraform.io/stellivix/technitium",
 		Debug:   debug,
 	}
 

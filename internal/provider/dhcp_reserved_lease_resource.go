@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/path"
-	"terraform-provider-technitium/internal/technitium"
+	"gitlab.com/stellivix/terraform-provider-technitium/internal/technitium"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"

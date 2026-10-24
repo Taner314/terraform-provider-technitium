@@ -1,5 +1,5 @@
 ---
-page_title: "Provider: kenske/technitium"
+page_title: "Provider: stellivix/technitium"
 description: |-
   Provider for managing Technitium DNS resources.
 ---
@@ -14,7 +14,7 @@ Provider for managing Technitium DNS server resources. This provider allows you 
 terraform {
   required_providers {
     technitium = {
-      source = "registry.terraform.io/kenske/technitium"
+      source = "registry.terraform.io/stellivix/technitium"
     }
   }
 }

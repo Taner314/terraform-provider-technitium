@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gitlab.com/stellivix/terraform-provider-technitium/internal/test"
 	"net/http"
 	"strings"
-	"terraform-provider-technitium/internal/test"
 	"testing"
 )
 
