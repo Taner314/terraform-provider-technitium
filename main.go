@@ -28,7 +28,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/stellivix/technitium",
+		Address: "registry.terraform.io/taner314/technitium",
 		Debug:   debug,
 	}
 

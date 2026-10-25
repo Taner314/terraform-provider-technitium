@@ -18,7 +18,7 @@ terraform {
   required_providers {
     technitium = {
       version = "~> 0.2.2"
-      source = "registry.terraform.io/stellivix/technitium"
+      source = "registry.terraform.io/taner314/technitium"
     }
   }
 }
@@ -43,7 +43,7 @@ Complete example:
 terraform {
   required_providers {
     technitium = {
-      source = "registry.terraform.io/stellivix/technitium"
+      source = "registry.terraform.io/taner314/technitium"
     }
   }
 }
@@ -115,7 +115,7 @@ server. Destroying one leaves the server settings unchanged.
 provider_installation {
 
   dev_overrides {
-      "registry.terraform.io/stellivix/technitium" = "/path/to/go/bin" # e.g. /home/user/go/bin
+      "registry.terraform.io/taner314/technitium" = "/path/to/go/bin" # e.g. /home/user/go/bin
   }
 
   # For all other providers, install them directly from their origin provider
@@ -139,7 +139,11 @@ CI (`.gitlab-ci.yml`) runs the acceptance suite against Technitium 14.x and 15.x
 
 ### Releasing
 
-Push a `vX.Y.Z` tag. GoReleaser builds the provider and attaches it to a GitLab release. Set the
-`GPG_PRIVATE_KEY` (and optionally `GPG_PASSPHRASE`) CI variables to sign the checksums, which the
-public Terraform/OpenTofu registries require.
+Push a `vX.Y.Z` tag (tags `v*` are protected). The GitLab `release` job runs GoReleaser and
+publishes a GitHub release on the mirror, [Taner314/terraform-provider-technitium](https://github.com/Taner314/terraform-provider-technitium),
+which the Terraform and OpenTofu registries read. Protected CI variables:
 
+- `GITHUB_TOKEN`: fine-grained PAT with Contents read & write on the mirror
+- `GPG_PRIVATE_KEY` (+ `GPG_PASSPHRASE`): RSA signing key for `SHA256SUMS`
+
+Tags with a suffix (`v0.1.0-rc1`) are published as pre-releases.

@@ -101,9 +101,11 @@ acceptance:
   script:
     - go test -v -cover -count=1 ./internal/provider/
 
-# Tag vX.Y.Z to release. Set GPG_PRIVATE_KEY (armored, masked/protected) and
-# optionally GPG_PASSPHRASE to sign SHA256SUMS as the Terraform registry
-# requires; without a key the release is built unsigned.
+# Tag vX.Y.Z to publish a GitHub release on the mirror (read by the Terraform
+# and OpenTofu registries). Needs protected CI variables: GITHUB_TOKEN
+# (fine-grained PAT, Contents: read & write on the mirror) and GPG_PRIVATE_KEY
+# (+ GPG_PASSPHRASE if set) to sign SHA256SUMS; without a key the release is
+# unsigned.
 release:
   stage: release
   image:
@@ -113,7 +115,6 @@ release:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
   variables:
     GIT_DEPTH: 0
-    GITLAB_TOKEN: $CI_JOB_TOKEN
   script:
     - |
       SKIP=""
@@ -121,12 +122,17 @@ release:
         echo "$GPG_PRIVATE_KEY" | gpg --batch --import
         export GPG_FINGERPRINT=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr/ {print $10; exit}')
         if [ -n "$GPG_PASSPHRASE" ]; then
-          echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
+          # Unlock once; gpg-agent caches the passphrase for GoReleaser's gpg calls.
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
           gpg-connect-agent reloadagent /bye
-          echo "$GPG_PASSPHRASE" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --sign -o /dev/null /dev/null
+          echo "$GPG_PASSPHRASE" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --local-user "$GPG_FINGERPRINT" --sign -o /dev/null /dev/null
         fi
       else
         echo "No GPG_PRIVATE_KEY set: building an unsigned release"
         SKIP="--skip=sign"
       fi
+      if [ -z "$GITHUB_TOKEN" ]; then
+        echo "GITHUB_TOKEN is not set (it must be a protected variable, and the tag protected)"; exit 1
+      fi
       goreleaser release --clean $SKIP
+
