@@ -54,6 +54,14 @@ generate:
     - make generate
     - git diff --compact-summary --exit-code || { echo "Run 'make generate' and commit."; exit 1; }
 
+# Every example must validate against the provider schema.
+examples:
+  stage: build
+  before_script:
+    - *install_terraform
+  script:
+    - ./scripts/validate-examples.sh
+
 unit:
   stage: test
   needs: [build]

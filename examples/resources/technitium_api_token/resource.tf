@@ -1,3 +1,8 @@
+resource "technitium_user" "external_dns" {
+  username = "external-dns"
+  password = var.external_dns_password
+}
+
 # The token is stored in state; protect the state.
 resource "technitium_api_token" "external_dns" {
   user = technitium_user.external_dns.username

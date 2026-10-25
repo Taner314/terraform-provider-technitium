@@ -1,15 +1,78 @@
 ---
-page_title: "Provider: taner314/technitium"
+page_title: "Provider: Technitium DNS Server"
 description: |-
-  Provider for managing Technitium DNS resources.
+  Manage Technitium DNS Server zones, records, blocking, DNS apps, DHCP, users and server settings.
 ---
 
-# Technitium Provider
+# Technitium DNS Server Provider
 
-Provider for managing Technitium DNS server resources. This provider allows you to manage DNS and DHCP configuration.
+Manage a [Technitium DNS Server](https://technitium.com/dns/) as code with Terraform or OpenTofu:
+authoritative zones and DNSSEC, every common record type, ad/malware blocking, DNS apps,
+DHCP scopes and reservations, users, groups and permissions, API tokens, SSO and server settings.
+
+Tested against **Technitium 14.x and 15.x** with Terraform and OpenTofu.
 
 ## Example Usage
 
-{{ tffile .ExampleFile }}
+{{ tffile "examples/provider/provider.tf" }}
 
-{{ .SchemaMarkdown }}
+A small but complete setup:
+
+```terraform
+resource "technitium_dns_zone" "home" {
+  name = "home.example.com"
+  type = "Primary"
+}
+
+resource "technitium_dns_record_a" "nas" {
+  zone       = technitium_dns_zone.home.name
+  name       = "nas"
+  ip_address = "192.168.1.10"
+  ptr        = true
+}
+
+resource "technitium_settings_forwarders" "this" {
+  forwarders = ["dns.quad9.net (9.9.9.9)", "cloudflare-dns.com (1.1.1.1)"]
+  protocol   = "Tls"
+}
+
+resource "technitium_settings_blocking" "this" {
+  enable_blocking = true
+  block_list_urls = ["https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"]
+}
+```
+
+## Authentication
+
+Use an API token (create one in the web console under *Administration → Sessions → Create Token*,
+or with `technitium_api_token`), or a username and password. Every setting can come from the
+environment instead:
+
+| Attribute | Environment variable |
+|---|---|
+| `host` | `TECHNITIUM_HOST` |
+| `token` | `TECHNITIUM_TOKEN` |
+| `username` / `password` | `TECHNITIUM_USERNAME` / `TECHNITIUM_PASSWORD` |
+| `skip_tls_verify` | `TECHNITIUM_SKIP_TLS_VERIFY` |
+
+Prefer a token for a dedicated user with only the permissions your configuration needs.
+
+## How the provider behaves
+
+- **Records** have no IDs in Technitium, so each record is identified by zone, name, type and its
+  data (e.g. the IP of an A record). Several records of one type at one name — round-robin A,
+  multiple TXT — are managed independently. Values the server normalises (case, trailing dots,
+  IPv6 form, hex) don't cause diffs.
+- **Settings** are split into singleton resources by area. Each owns only the attributes you set;
+  everything else keeps following the server.
+- **Everything can be imported**; each resource's page shows its import ID format. See the
+  [importing guide](docs/guides/importing).
+
+## Guides
+
+- [Getting started](docs/guides/getting-started)
+- [Importing an existing server](docs/guides/importing)
+- [Technitium 14 vs 15](docs/guides/versions)
+- [Migrating from kenske/technitium](docs/guides/migrating-from-kenske)
+
+{{ .SchemaMarkdown | trimspace }}

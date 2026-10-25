@@ -1,3 +1,7 @@
+resource "technitium_group" "dns_ops" {
+  name = "dns-ops"
+}
+
 resource "technitium_user" "external_dns" {
   username     = "external-dns"
   password     = var.external_dns_password

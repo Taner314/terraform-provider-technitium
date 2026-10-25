@@ -1,3 +1,8 @@
+resource "technitium_group" "dns_ops" {
+  name        = "dns-ops"
+  description = "Can edit zones"
+}
+
 resource "technitium_permission" "dns_ops_zones" {
   section    = "Zones"
   group      = technitium_group.dns_ops.name
