@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"gitlab.com/stellivix/terraform-provider-technitium/internal/technitium"
 
@@ -654,6 +656,37 @@ func (f recordField) schemaAttribute() schema.Attribute {
 	}
 }
 
+// rrsetLocks serialises writes to one RRset (zone + name + type). The server
+// rewrites the whole RRset on every change, so parallel updates to records of
+// the same name and type can drop one of them (seen on Technitium 14).
+var rrsetLocks sync.Map
+
+// lockRRsets locks the RRsets of vals in a fixed order (renames lock two;
+// sorted keys avoid deadlocks between opposite renames) and returns the
+// unlock function.
+func (s *recordSpec) lockRRsets(vals ...recordVals) func() {
+	keys := make([]string, 0, len(vals))
+	for _, v := range vals {
+		k := strings.ToLower(fqdn(v.name, v.zone)) + "|" + s.typ
+		if !slices.Contains(keys, k) {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	locked := make([]*sync.Mutex, 0, len(keys))
+	for _, k := range keys {
+		m, _ := rrsetLocks.LoadOrStore(k, &sync.Mutex{})
+		mu, _ := m.(*sync.Mutex)
+		mu.Lock()
+		locked = append(locked, mu)
+	}
+	return func() {
+		for i := len(locked) - 1; i >= 0; i-- {
+			locked[i].Unlock()
+		}
+	}
+}
+
 // recordResource is the Terraform resource for one recordSpec.
 type recordResource struct {
 	client *technitium.Client
@@ -714,6 +747,7 @@ func (r *recordResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
+	defer r.spec.lockRRsets(plan)()
 	rec, err := r.client.AddRecord(ctx, r.spec.addParams(plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating "+r.spec.typ+" record", err.Error())
@@ -777,6 +811,7 @@ func (r *recordResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
+	defer r.spec.lockRRsets(state, plan)()
 	rec, err := r.client.UpdateRecord(ctx, r.spec.updateParams(state, plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating "+r.spec.typ+" record", err.Error())
@@ -793,6 +828,7 @@ func (r *recordResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
+	defer r.spec.lockRRsets(state)()
 	if err := r.client.DeleteRecord(ctx, r.spec.deleteParams(state)); err != nil {
 		resp.Diagnostics.AddError("Error deleting "+r.spec.typ+" record", err.Error())
 	}

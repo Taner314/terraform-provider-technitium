@@ -367,3 +367,43 @@ data "technitium_dns_records" "mx" {
 		}},
 	})
 }
+
+// Many records of one RRset changed in one apply are updated in parallel by
+// Terraform; the server rewrites the whole RRset per change, so without
+// per-RRset serialisation records get lost (Technitium 14).
+func TestAccDnsRecord_parallelSameRRset(t *testing.T) {
+	config := func(ttl int) string {
+		return testProviderConfig + fmt.Sprintf(`
+resource "technitium_dns_zone" "test" {
+  name = "rec-parallel.test"
+  type = "Primary"
+}
+
+resource "technitium_dns_record_a" "rr" {
+  count      = 8
+  zone       = technitium_dns_zone.test.name
+  name       = "rr"
+  ip_address = "10.0.1.${count.index + 1}"
+  ttl        = %d
+}
+`, ttl)
+	}
+	checkAll := func(_ *terraform.State) error {
+		recs, err := testClient(t).GetRecords(context.Background(), "rec-parallel.test", "rr.rec-parallel.test", false)
+		if err != nil {
+			return err
+		}
+		if n := len(recs); n != 8 {
+			return fmt.Errorf("server has %d A records at rr, want 8", n)
+		}
+		return nil
+	}
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: config(120), Check: checkAll},
+			{Config: config(300), Check: checkAll},
+			{Config: config(600), Check: checkAll},
+		},
+	})
+}

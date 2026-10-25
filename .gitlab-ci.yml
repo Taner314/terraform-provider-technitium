@@ -109,6 +109,14 @@ acceptance:
           -d proxyBypass="127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,localhost" \
           "$TECHNITIUM_HOST/api/settings/set" | grep -q '"status":"ok"' || { echo "setting the Technitium proxy failed"; exit 1; }
         echo "Technitium proxy: $ptype ${hostport}"
+        # Technitium resolves names itself (recursion from the root servers
+        # over UDP, random source ports) and hands the proxy an IP, so with an
+        # egress-restricted pod it must forward to the pod's own DNS instead.
+        # That address is in proxyBypass, so lookups go direct to kube-dns.
+        export TECHNITIUM_TEST_FORWARDER=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf)
+        curl -sf -d token="$token" -d forwarders="$TECHNITIUM_TEST_FORWARDER" -d forwarderProtocol=Udp \
+          "$TECHNITIUM_HOST/api/settings/set" | grep -q '"status":"ok"' || { echo "setting the Technitium forwarder failed"; exit 1; }
+        echo "Technitium forwarder: $TECHNITIUM_TEST_FORWARDER"
       fi
   script:
     - go test -v -cover -count=1 ./internal/provider/

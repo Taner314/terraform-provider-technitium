@@ -120,11 +120,8 @@ resource "technitium_settings_forwarders" "this" {
 				Check: resource.TestCheckResourceAttr("technitium_settings_forwarders.this", "forwarders.1", "dns.quad9.net (9.9.9.9)"),
 			},
 			{
-				Config: testProviderConfig + `
-resource "technitium_settings_forwarders" "this" {
-  forwarders = []
-  protocol   = "Udp"
-}`,
+				// Back to the CI forwarder (or none).
+				Config: testProviderConfig + restoreForwardersConfig(),
 			},
 			{
 				// Restore the CI proxy (or none) so other tests aren't affected.
@@ -159,4 +156,18 @@ resource "technitium_settings_proxy" "this" {
   port    = %s
   bypass  = ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "localhost"]
 }`, ptype, u.Hostname(), u.Port())
+}
+
+// restoreForwardersConfig returns the forwarders the test server started
+// with: TECHNITIUM_TEST_FORWARDER (set by CI next to the proxy) or none.
+func restoreForwardersConfig() string {
+	fwd := "[]"
+	if f := os.Getenv("TECHNITIUM_TEST_FORWARDER"); f != "" {
+		fwd = fmt.Sprintf("[%q]", f)
+	}
+	return `
+resource "technitium_settings_forwarders" "this" {
+  forwarders = ` + fwd + `
+  protocol   = "Udp"
+}`
 }
