@@ -49,12 +49,15 @@ signs:
       - "${signature}"
       - "--detach-sign"
       - "${artifact}"
-# Releases go to GitLab; assets are stored in the project's generic
-# package registry using the CI job token.
-gitlab_urls:
-  use_package_registry: true
-  use_job_token: true
+# Releases are published to the GitHub mirror, which the Terraform and
+# OpenTofu registries read.
 release:
+  github:
+    owner: Taner314
+    name: terraform-provider-technitium
+  # Create the tag on GitHub at this commit if the mirror hasn't pushed it yet.
+  target_commitish: '{{ .FullCommit }}'
+  prerelease: auto
   extra_files:
     - glob: 'terraform-registry-manifest.json'
       name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
