@@ -63,5 +63,13 @@ release:
       name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
   # If you want to manually examine the release before its live, uncomment this line:
   # draft: true
+# Final releases use the CHANGELOG.md section (--release-notes in CI);
+# pre-releases without one fall back to the commit list.
 changelog:
-  disable: true
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - '^Merge branch'
+      - '^docs:'
+      - '^test:'
