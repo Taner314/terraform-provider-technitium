@@ -1,6 +1,9 @@
 package provider
 
 import (
+	"fmt"
+	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -124,13 +127,36 @@ resource "technitium_settings_forwarders" "this" {
 }`,
 			},
 			{
-				// Turn the proxy off so other tests aren't affected.
-				Config: testProviderConfig + `
-resource "technitium_settings_proxy" "this" {
-  type = "None"
-}`,
-				Check: resource.TestCheckResourceAttr("technitium_settings_proxy.this", "type", "None"),
+				// Restore the CI proxy (or none) so other tests aren't affected.
+				Config: testProviderConfig + restoreProxyConfig(t),
 			},
 		},
 	})
+}
+
+// restoreProxyConfig returns the proxy config the test server started with:
+// TECHNITIUM_TEST_PROXY if set, else no proxy.
+func restoreProxyConfig(t *testing.T) string {
+	p := os.Getenv("TECHNITIUM_TEST_PROXY")
+	if p == "" {
+		return `
+resource "technitium_settings_proxy" "this" {
+  type = "None"
+}`
+	}
+	u, err := url.Parse(p)
+	if err != nil {
+		t.Fatalf("TECHNITIUM_TEST_PROXY: %v", err)
+	}
+	ptype := "Http"
+	if strings.HasPrefix(u.Scheme, "socks5") {
+		ptype = "Socks5"
+	}
+	return fmt.Sprintf(`
+resource "technitium_settings_proxy" "this" {
+  type    = %q
+  address = %q
+  port    = %s
+  bypass  = ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "localhost"]
+}`, ptype, u.Hostname(), u.Port())
 }

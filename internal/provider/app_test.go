@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -49,7 +51,16 @@ func skipWithoutAppStore(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodHead, "https://download.technitium.com/dns/apps/SplitHorizonApp-v10.zip", nil)
-	resp, err := http.DefaultClient.Do(req)
+	client := http.DefaultClient
+	// Check through the same proxy the server was given.
+	if p := os.Getenv("TECHNITIUM_TEST_PROXY"); p != "" {
+		u, err := url.Parse(p)
+		if err != nil {
+			t.Fatalf("TECHNITIUM_TEST_PROXY: %v", err)
+		}
+		client = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(u)}}
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Skipf("DNS App Store unreachable: %v", err)
 	}

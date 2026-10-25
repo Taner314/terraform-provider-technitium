@@ -98,6 +98,18 @@ acceptance:
         sleep 2
       done
       curl -sf -d user=admin -d pass=password "$TECHNITIUM_HOST/api/user/login" >/dev/null || { echo "Technitium not ready"; exit 1; }
+    # Optional outbound proxy for the server's own downloads (DNS app store),
+    # e.g. TECHNITIUM_TEST_PROXY=socks5://10.0.0.5:1080 or http://host:3128.
+    - |
+      if [ -n "$TECHNITIUM_TEST_PROXY" ]; then
+        scheme=${TECHNITIUM_TEST_PROXY%%://*}; hostport=${TECHNITIUM_TEST_PROXY#*://}
+        case "$scheme" in socks5*) ptype=Socks5 ;; http*) ptype=Http ;; *) echo "unsupported proxy scheme $scheme"; exit 1 ;; esac
+        token=$(curl -sf -d user=admin -d pass=password "$TECHNITIUM_HOST/api/user/login" | sed -E 's/.*"token":"([^"]+)".*/\1/')
+        curl -sf -d token="$token" -d proxyType=$ptype -d proxyAddress="${hostport%:*}" -d proxyPort="${hostport##*:}" \
+          -d proxyBypass="127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,localhost" \
+          "$TECHNITIUM_HOST/api/settings/set" | grep -q '"status":"ok"' || { echo "setting the Technitium proxy failed"; exit 1; }
+        echo "Technitium proxy: $ptype ${hostport}"
+      fi
   script:
     - go test -v -cover -count=1 ./internal/provider/
 
