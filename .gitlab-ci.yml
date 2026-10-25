@@ -74,6 +74,9 @@ acceptance:
   stage: test
   needs: [build]
   timeout: 20m
+  # One slot per matrix combination: the four combinations run in parallel,
+  # but overlapping pipelines queue instead of exceeding the runner quota.
+  resource_group: acceptance-$TECHNITIUM_VERSION-$TF_CLI
   services:
     - name: technitium/dns-server:$TECHNITIUM_VERSION
       alias: technitium
