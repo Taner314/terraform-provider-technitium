@@ -1,21 +1,16 @@
 terraform {
   required_providers {
     technitium = {
-      source = "registry.terraform.io/taner314/technitium"
+      source = "taner314/technitium"
     }
   }
 }
 
-
-# Using API token
 provider "technitium" {
-  host  = "http://localhost:5380"
-  token = var.TECHNITIUM_TOKEN
-}
+  host  = "https://dns.example.com:53443"
+  token = var.technitium_token
 
-# Using API username/password
-provider "technitium" {
-  host     = "http://localhost:5380"
-  username = "admin"
-  password = "password"
+  # Or log in with a username and password instead of a token:
+  # username = "terraform"
+  # password = var.technitium_password
 }

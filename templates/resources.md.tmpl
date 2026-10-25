@@ -1,0 +1,39 @@
+{{- $p := split .Name "_" -}}
+{{- $a := index $p 1 -}}
+{{- $b := "" -}}{{- if gt (len $p) 2 -}}{{- $b = index $p 2 -}}{{- end -}}
+{{- $group := "Server" -}}
+{{- if and (eq $a "dns") (or (eq $b "record") (eq $b "records")) -}}{{- $group = "DNS Records" -}}
+{{- else if or (eq $a "dns") (eq $a "tsig") -}}{{- $group = "DNS Zones" -}}
+{{- else if or (eq $a "blocked") (eq $a "allowed") -}}{{- $group = "Blocking" -}}
+{{- else if eq $a "app" -}}{{- $group = "DNS Apps" -}}
+{{- else if or (eq $a "user") (eq $a "group") (eq $a "permission") (eq $a "zone") (eq $a "api") (eq $a "sso") -}}{{- $group = "Access Control" -}}
+{{- else if eq $a "settings" -}}{{- $group = "Server Settings" -}}
+{{- else if eq $a "dhcp" -}}{{- $group = "DHCP" -}}
+{{- end -}}
+---
+page_title: "{{.Name}} {{.Type}} - {{.RenderedProviderName}}"
+subcategory: "{{ $group }}"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+{{ if .HasExamples -}}
+## Example Usage
+
+{{- range .ExampleFiles }}
+
+{{ tffile . }}
+{{- end }}
+{{- end }}
+
+{{ .SchemaMarkdown | trimspace }}
+{{- if .HasImport }}
+
+## Import
+
+{{codefile "shell" .ImportFile }}
+{{- end }}
