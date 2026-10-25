@@ -165,5 +165,12 @@ release:
       if [ -z "$GITHUB_TOKEN" ]; then
         echo "GITHUB_TOKEN is not set (it must be a protected variable, and the tag protected)"; exit 1
       fi
-      goreleaser release --clean $SKIP
+      # Release notes from CHANGELOG.md; required for final releases.
+      NOTES=""
+      if ./scripts/release-notes.sh "$CI_COMMIT_TAG" > /tmp/release-notes.md; then
+        NOTES="--release-notes=/tmp/release-notes.md"
+      elif ! echo "$CI_COMMIT_TAG" | grep -q -- '-'; then
+        echo "CHANGELOG.md has no section for $CI_COMMIT_TAG"; exit 1
+      fi
+      goreleaser release --clean $SKIP $NOTES
 

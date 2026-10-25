@@ -4,7 +4,7 @@ Terraform/OpenTofu provider for the Technitium DNS Server [API](https://github.c
 Tested against Technitium v14.x and v15.x.
 
 Forked from [kenske/terraform-provider-technitium](https://github.com/kenske/terraform-provider-technitium) (MIT).
-Not yet published to a public registry; see [Provider Development](#provider-development) for local use.
+Published as [`taner314/technitium`](https://registry.terraform.io/providers/taner314/technitium/latest). See [CHANGELOG.md](CHANGELOG.md).
 
 > **0.x, breaking changes expected.** Resource schemas differ from upstream: the single
 > `technitium_dns_zone_record` resource was replaced by one resource per record type.
@@ -146,4 +146,5 @@ which the Terraform and OpenTofu registries read. Protected CI variables:
 - `GITHUB_TOKEN`: fine-grained PAT with Contents read & write on the mirror
 - `GPG_PRIVATE_KEY` (+ `GPG_PASSPHRASE`): RSA signing key for `SHA256SUMS`
 
-Tags with a suffix (`v0.1.0-rc1`) are published as pre-releases.
+Tags with a suffix (`v0.1.0-rc1`) are published as pre-releases. The release notes are the
+version's section of [CHANGELOG.md](CHANGELOG.md); a final release fails without one.
